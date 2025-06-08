@@ -1,0 +1,15 @@
+<launch>
+
+  <arg name="config_path" default="$(find tracker_control)/config/estimator_config.yaml" />
+
+  <!-- MASTER NODE! -->
+  <node name="tracker_control"
+        pkg="tracker_control"
+        type="object_detector.py"
+        output="screen">
+  </node>
+
+  <node pkg="tracker_control" type="image_publisher.py" name="image_pub" output="screen" args="../lab.jpg">
+  </node>
+
+</launch>

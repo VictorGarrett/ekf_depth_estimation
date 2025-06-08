@@ -1,0 +1,185 @@
+<?xml version="1.0" ?>
+<sdf version="1.6">
+  <world name="default">
+
+    <!-- Global lighting -->
+    <include>
+      <uri>model://sun</uri>
+    </include>
+
+    <!-- Ground Plane -->
+    <model name="ground_plane">
+      <static>true</static>
+      <link name="link">
+        <collision name="collision">
+          <geometry>
+            <plane>
+              <normal>0 0 1</normal>
+              <size>100 100</size>
+            </plane>
+          </geometry>
+        </collision>
+        <visual name="visual">
+          <geometry>
+            <plane>
+              <normal>0 0 1</normal>
+              <size>100 100</size>
+            </plane>
+          </geometry>
+          <material>
+            <script>
+              <uri>file://media/materials/scripts/gazebo.material</uri>
+              <name>Gazebo/Grass</name>
+            </script>
+          </material>
+        </visual>
+      </link>
+    </model>
+
+    <!-- Black Box -->
+    <model name="black_box">
+      <pose>0 0 0.5 0 0 0</pose>
+      <static>true</static>
+      <link name="link">
+        <collision name="collision">
+          <geometry>
+            <box><size>1 1 1</size></box>
+          </geometry>
+        </collision>
+        <visual name="visual">
+          <geometry>
+            <box><size>1 1 1</size></box>
+          </geometry>
+          <material>
+            <script>
+              <uri>file://media/materials/scripts</uri>
+              <name>wood</name>
+            </script>
+          </material>
+        </visual>
+      </link>
+    </model>
+
+    <!-- Red Box -->
+    <model name="red_box">
+      <pose>2 0 0.5 0 0 0</pose>
+      <static>true</static>
+      <link name="link">
+        <collision name="collision">
+          <geometry>
+            <box><size>1 1 1</size></box>
+          </geometry>
+        </collision>
+        <visual name="visual">
+          <geometry>
+            <box><size>1 1 1</size></box>
+          </geometry>
+          <material>
+            <script>
+              <uri>file://media/materials/scripts</uri>
+              <name>wood</name>
+            </script>
+          </material>
+        </visual>
+      </link>
+    </model>
+
+    <!-- Green Box -->
+    <model name="green_box">
+      <pose>-2 0 0.5 0 0 0</pose>
+      <static>true</static>
+      <link name="link">
+        <collision name="collision">
+          <geometry>
+            <box><size>0.8 0.8 0.8</size></box>
+          </geometry>
+        </collision>
+        <visual name="visual">
+          <geometry>
+            <box><size>0.8 0.8 0.8</size></box>
+          </geometry>
+          <material>
+            <script>
+              <uri>file://media/materials/scripts</uri>
+              <name>wood</name>
+            </script>
+          </material>
+        </visual>
+      </link>
+    </model>
+
+    <!-- Blue Box -->
+    <model name="blue_box">
+      <pose>0 2 0.6 0 0 0</pose>
+      <static>true</static>
+      <link name="link">
+        <collision name="collision">
+          <geometry>
+            <box><size>1.2 1.2 1.2</size></box>
+          </geometry>
+        </collision>
+        <visual name="visual">
+          <geometry>
+            <box><size>1.2 1.2 1.2</size></box>
+          </geometry>
+          <material>
+            <script>
+              <uri>file://media/materials/scripts</uri>
+              <name>wood</name>
+            </script>
+          </material>
+        </visual>
+      </link>
+    </model>
+
+    <!-- Yellow Box -->
+    <model name="yellow_box">
+      <pose>0 -2 0.75 0 0 0.785</pose>
+      <static>true</static>
+      <link name="link">
+        <collision name="collision">
+          <geometry>
+            <box><size>0.6 0.6 1.5</size></box>
+          </geometry>
+        </collision>
+        <visual name="visual">
+          <geometry>
+            <box><size>0.6 0.6 1.5</size></box>
+          </geometry>
+          <material>
+            <script>
+              <uri>file://media/materials/scripts</uri>
+              <name>wood</name>
+            </script>
+          </material>
+        </visual>
+      </link>
+    </model>
+
+    <!-- Transparent Purple Box -->
+    <model name="purple_box">
+      <pose>3 3 0.3 0 0 0</pose>
+      <static>true</static>
+      <link name="link">
+        <collision name="collision">
+          <geometry>
+            <box><size>0.6 0.6 0.6</size></box>
+          </geometry>
+        </collision>
+        <visual name="visual">
+          <geometry>
+            <box><size>0.6 0.6 0.6</size></box>
+          </geometry>
+          <material>
+            <script>
+              <uri>file://media/materials/scripts</uri>
+              <name>wood</name>
+            </script>
+            <transparency>0.3</transparency>
+          </material>
+        </visual>
+      </link>
+    </model>
+
+  </world>
+</sdf>

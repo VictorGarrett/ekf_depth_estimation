@@ -1,0 +1,473 @@
+<?xml version="1.0"?>
+<sdf version="1.6">
+  <model name="sliping_robot">
+    <static>false</static>
+    <pose>0 0 0 0 0 0</pose>
+
+    <!-- ============================
+         P3D Plugin (if you re-enable)
+         ============================ -->
+    <plugin name="ground_truth_plugin" filename="libgazebo_ros_p3d.so">
+      <frameName>world</frameName>
+      <bodyName>base_link</bodyName>
+      <topicName>ground_truth/odometry</topicName>
+      <updateRate>30</updateRate>
+    </plugin>
+
+    <!-- ============================
+         BASE LINK (with sensors)
+         ============================ -->
+    <link name="base_link">
+      <selfCollide>false</selfCollide>
+      <pose>0 0 0.18 0 0 0</pose>
+      <inertial>
+        <mass>5.0</mass>
+        <inertia>
+          <ixx>0.25</ixx><ixy>0.0</ixy><ixz>0.0</ixz>
+          <iyy>0.25</iyy><iyz>0.0</iyz><izz>0.25</izz>
+        </inertia>
+      </inertial>
+
+      <!-- Collision -->
+      <collision name="base_collision">
+        <geometry>
+          <box>
+            <size>0.8 0.4 0.2</size>
+          </box>
+        </geometry>
+        <surface>
+          <contact>
+            <ode>
+              <min_depth>0.001</min_depth>
+              <max_vel>100</max_vel>
+            </ode>
+          </contact>
+        </surface>
+      </collision>
+
+      <!-- Visual -->
+      <visual name="base_visual">
+        <geometry>
+          <box>
+            <size>0.8 0.4 0.2</size>
+          </box>
+        </geometry>
+        <material>
+          <ambient>0 0.5 1 1</ambient>
+          <diffuse>0 0.5 1 1</diffuse>
+        </material>
+      </visual>
+      <visual name="camera_imu_visual">
+        <pose>0.4 0 0.1 0 0 0</pose>
+        <geometry>
+          <box>
+            <size>0.05 0.05 0.05</size>
+          </box>
+        </geometry>
+        <material>
+          <ambient>1 1 0 1</ambient>
+          <diffuse>1 1 0 1</diffuse>
+        </material>
+      </visual>
+
+      <!-- IMU Sensor -->
+      <sensor name="imu_sensor" type="imu">
+        <pose>0.4 0 0.1 0 0 0</pose>
+        <always_on>true</always_on>
+        <plugin name="imu_plugin" filename="libgazebo_ros_imu_sensor.so">
+          <topicName>/imu/data</topicName>
+          <bodyName>base_link</bodyName>
+          <updateRateHZ>200</updateRateHZ>
+          <gaussianNoise>0.001</gaussianNoise>
+          <frameName>base_link</frameName>
+          <initialOrientationAsReference>false</initialOrientationAsReference>
+        </plugin>
+      </sensor>
+
+      <!-- Camera Sensor -->
+      <sensor name="camera_sensor" type="camera">
+        <pose>0.4 0 0.1 0 0 0</pose>
+        <camera>
+          <horizontal_fov>1.0472</horizontal_fov>
+          <image>
+            <width>640</width>
+            <height>480</height>
+          </image>
+          <clip>
+            <near>0.05</near>
+            <far>100</far>
+          </clip>
+        </camera>
+        <always_on>true</always_on>
+        <plugin name="camera_controller" filename="libgazebo_ros_camera.so">
+          <alwaysOn>true</alwaysOn>
+          <updateRate>20.0</updateRate>
+          <cameraName>camera</cameraName>
+          <imageTopicName>image_raw</imageTopicName>
+          <cameraInfoTopicName>camera_info</cameraInfoTopicName>
+          <frameName>base_link</frameName>
+          <hackBaseline>0.0</hackBaseline>
+        </plugin>
+      </sensor>
+    </link>
+
+    <!-- =======================================
+         FRONT-LEFT WHEEL LINK + CONTINUOUS JOINT
+         ======================================= -->
+    <link name="front_left_wheel">
+      <!-- 
+           cylinder rotated −1.5708 around X so its local Z→Y.
+           Pose: x=0.15, y=+0.2, z=0.05 (just touching ground).
+      -->
+      <pose>0.15 0.2 0.05 -1.5708 0 0</pose>
+      <inertial>
+        <mass>0.1</mass>
+        <inertia>
+          <ixx>0.0007</ixx>
+          <iyy>0.00013</iyy>
+          <izz>0.0007</izz>
+        </inertia>
+      </inertial>
+
+      <collision name="fl_collision">
+        <geometry>
+          <cylinder>
+            <radius>0.05</radius>
+            <length>0.02</length>
+          </cylinder>
+        </geometry>
+        <surface>
+          <friction>
+            <ode>
+              <mu1>1</mu1>
+              <mu2>1</mu2>
+              <kp>1e8</kp>
+              <kd>1</kd>
+            </ode>
+          </friction>
+          <contact>
+            <ode>
+              <kp>1e6</kp>
+              <kd>1.0</kd>
+              <max_vel>0.1</max_vel>
+              <min_depth>0.001</min_depth>
+            </ode>
+          </contact>
+        </surface>
+      </collision>
+
+      <visual name="fl_visual">
+        <geometry>
+          <cylinder>
+            <radius>0.05</radius>
+            <length>0.02</length>
+          </cylinder>
+        </geometry>
+        <material>
+          <ambient>0.3 0.3 0.3 1</ambient>
+          <diffuse>0.3 0.3 0.3 1</diffuse>
+        </material>
+      </visual>
+    </link>
+
+    <joint name="front_left_joint" type="revolute">
+      <parent>base_link</parent>
+      <child>front_left_wheel</child>
+      <axis>
+        <!-- Because the cylinder’s local Z was rotated into Y, we roll around Y: -->
+        <xyz>0 0 1</xyz>
+        <limit>
+          <effort>100000</effort>
+          <velocity>100000</velocity>
+          <lower>-1e16</lower>
+          <upper> 1e16</upper>
+        </limit>
+        <dynamics>
+          <damping>0.005</damping>
+          <friction>0.01</friction>
+        </dynamics>
+      </axis>
+    </joint>
+
+
+    <!-- DC Motor plugin for front_left_joint -->
+
+    <plugin name="front_left_motor_plugin" filename="libgazebo_ros_dc_motor.so">
+      <motor_shaft_joint>front_left_joint</motor_shaft_joint>
+      <motor_wrench_frame>front_left_wheel</motor_wrench_frame>
+      <command_topic>front_left_motor/command</command_topic>
+      <velocity_topic>front_left_motor/velocity</velocity_topic>
+      <encoder_topic>front_left_motor/encoder</encoder_topic>
+      <current_topic>front_left_motor/current</current_topic>
+      <supply_topic>front_left_motor/supply_voltage</supply_topic>
+
+      <publish_encoder>true</publish_encoder>
+      <publish_velocity>true</publish_velocity>
+      <publish_current>true</publish_current>
+      <publish_motor_joint_state>true</publish_motor_joint_state>
+      <update_rate>100.0</update_rate>
+
+      <velocity_noise>0.1</velocity_noise>
+      <motor_nominal_voltage>12.0</motor_nominal_voltage>
+      <moment_of_inertia>0.001</moment_of_inertia>
+      <armature_damping_ratio>0.0001</armature_damping_ratio>
+      <electromotive_force_constant>0.08</electromotive_force_constant>
+      <electric_resistance>1.0</electric_resistance>
+      <electric_inductance>0.001</electric_inductance>
+      <gear_ratio>10</gear_ratio>
+      <encoder_ppr>4096</encoder_ppr>
+      <rosDebugLevel>Debug</rosDebugLevel>
+    </plugin>
+
+    <!-- =======================================
+         FRONT-RIGHT WHEEL LINK + CONTINUOUS JOINT
+         ======================================= -->
+    <link name="front_right_wheel">
+      <pose>0.15 -0.2 0.05 -1.5708 0 0</pose>
+      <inertial>
+        <mass>0.1</mass>
+        <inertia>
+          <ixx>0.0007</ixx>
+          <iyy>0.00013</iyy>
+          <izz>0.0007</izz>
+        </inertia>
+      </inertial>
+
+      <collision name="fr_collision">
+        <geometry>
+          <cylinder>
+            <radius>0.05</radius>
+            <length>0.02</length>
+          </cylinder>
+        </geometry>
+        <surface>
+          <friction>
+            <ode>
+              <mu1>1</mu1>
+              <mu2>1</mu2>
+              <kp>1e8</kp>
+              <kd>1</kd>
+            </ode>
+          </friction>
+          <contact>
+            <ode>
+              <kp>1e6</kp>
+              <kd>1.0</kd>
+              <max_vel>0.1</max_vel>
+              <min_depth>0.001</min_depth>
+            </ode>
+          </contact>
+        </surface>
+      </collision>
+
+      <visual name="fr_visual">
+        <geometry>
+          <cylinder>
+            <radius>0.05</radius>
+            <length>0.02</length>
+          </cylinder>
+        </geometry>
+        <material>
+          <ambient>0.3 0.3 0.3 1</ambient>
+          <diffuse>0.3 0.3 0.3 1</diffuse>
+        </material>
+      </visual>
+    </link>
+
+    <joint name="front_right_joint" type="revolute">
+      <parent>base_link</parent>
+      <child>front_right_wheel</child>
+      <axis>
+        <xyz>0 0 1</xyz>
+        <limit>
+          <lower>-1e16</lower>
+          <upper> 1e16</upper>
+          <effort>1000000</effort>
+          <velocity>1000</velocity>
+        </limit>
+        <dynamics>
+          <damping>0.005</damping>
+          <friction>0.01</friction>
+        </dynamics>
+      </axis>
+    </joint>
+
+    <!-- DC Motor plugin for front_right_joint -->
+    <plugin name="front_right_motor_plugin" filename="libgazebo_ros_dc_motor.so">
+      <motor_shaft_joint>front_right_joint</motor_shaft_joint>
+      <motor_wrench_frame>front_right_wheel</motor_wrench_frame>
+      <command_topic>front_right_motor/command</command_topic>
+      <velocity_topic>front_right_motor/velocity</velocity_topic>
+      <encoder_topic>front_right_motor/encoder</encoder_topic>
+      <current_topic>front_right_motor/current</current_topic>
+      <supply_topic>front_right_motor/supply_voltage</supply_topic>
+
+      <publish_encoder>true</publish_encoder>
+      <publish_velocity>true</publish_velocity>
+      <publish_current>true</publish_current>
+      <publish_motor_joint_state>true</publish_motor_joint_state>
+      <update_rate>100.0</update_rate>
+
+      <velocity_noise>0.1</velocity_noise>
+      <motor_nominal_voltage>12.0</motor_nominal_voltage>
+      <moment_of_inertia>0.001</moment_of_inertia>
+      <armature_damping_ratio>0.0001</armature_damping_ratio>
+      <electromotive_force_constant>0.08</electromotive_force_constant>
+      <electric_resistance>1.0</electric_resistance>
+      <electric_inductance>0.001</electric_inductance>
+      <gear_ratio>10</gear_ratio>
+
+      <encoder_ppr>4096</encoder_ppr>
+      <rosDebugLevel>Debug</rosDebugLevel>
+    </plugin>
+
+
+    <!-- =======================================
+         REAR-LEFT WHEEL LINK + REVOLUTE JOINT
+         ======================================= -->
+    <link name="rear_left_wheel">
+      <pose>-0.35 0.2 0.05 -1.5708 0 0</pose>
+      <inertial>
+        <mass>0.1</mass>
+        <inertia>
+          <ixx>0.0007</ixx>
+          <iyy>0.00013</iyy>
+          <izz>0.0007</izz>
+        </inertia>
+      </inertial>
+
+      <collision name="rl_collision">
+        <geometry>
+          <cylinder>
+            <radius>0.05</radius>
+            <length>0.02</length>
+          </cylinder>
+        </geometry>
+        <surface>
+          <friction>
+            <ode>
+              <mu1>0.5</mu1>
+              <mu2>0.5</mu2>
+              <kp>1e8</kp>
+              <kd>1</kd>
+            </ode>
+          </friction>
+          <contact>
+            <ode>
+              <kp>1e6</kp>
+              <kd>1.0</kd>
+              <max_vel>0.1</max_vel>
+              <min_depth>0.001</min_depth>
+            </ode>
+          </contact>
+        </surface>
+      </collision>
+
+      <visual name="rl_visual">
+        <geometry>
+          <cylinder>
+            <radius>0.05</radius>
+            <length>0.02</length>
+          </cylinder>
+        </geometry>
+        <material>
+          <ambient>0.3 0.3 0.3 1</ambient>
+          <diffuse>0.3 0.3 0.3 1</diffuse>
+        </material>
+      </visual>
+    </link>
+
+    <joint name="rear_left_joint" type="revolute">
+      <parent>base_link</parent>
+      <child>rear_left_wheel</child>
+      <axis>
+        <!-- Revolute but with huge ± limits so it can spin continuously -->
+        <xyz>0 0 1</xyz>
+        <limit>
+          <lower>-1e16</lower>
+          <upper> 1e16</upper>
+          <effort>100</effort>
+          <velocity>1000</velocity>
+        </limit>
+        <dynamics>
+          <damping>0.002</damping>
+          <friction>0.005</friction>
+        </dynamics>
+      </axis>
+    </joint>
+
+    <!-- =======================================
+         REAR-RIGHT WHEEL LINK + REVOLUTE JOINT
+         ======================================= -->
+    <link name="rear_right_wheel">
+      <pose>-0.35 -0.2 0.05 -1.5708 0 0</pose>
+      <inertial>
+        <mass>0.1</mass>
+        <inertia>
+          <ixx>0.0007</ixx>
+          <iyy>0.00013</iyy>
+          <izz>0.0007</izz>
+        </inertia>
+      </inertial>
+
+      <collision name="rr_collision">
+        <geometry>
+          <cylinder>
+            <radius>0.05</radius>
+            <length>0.02</length>
+          </cylinder>
+        </geometry>
+        <surface>
+          <friction>
+            <ode>
+              <mu1>0.5</mu1>
+              <mu2>0.5</mu2>
+              <kp>1e8</kp>
+              <kd>1</kd>
+            </ode>
+          </friction>
+          <contact>
+            <ode>
+              <kp>1e6</kp>
+              <kd>1.0</kd>
+              <max_vel>0.1</max_vel>
+              <min_depth>0.001</min_depth>
+            </ode>
+          </contact>
+        </surface>
+      </collision>
+
+      <visual name="rr_visual">
+        <geometry>
+          <cylinder>
+            <radius>0.05</radius>
+            <length>0.02</length>
+          </cylinder>
+        </geometry>
+        <material>
+          <ambient>0.3 0.3 0.3 1</ambient>
+          <diffuse>0.3 0.3 0.3 1</diffuse>
+        </material>
+      </visual>
+    </link>
+
+    <joint name="rear_right_joint" type="revolute">
+      <parent>base_link</parent>
+      <child>rear_right_wheel</child>
+      <axis>
+        <xyz>0 0 1</xyz>
+        <limit>
+          <lower>-1e16</lower>
+          <upper> 1e16</upper>
+          <effort>100</effort>
+          <velocity>1000</velocity>
+        </limit>
+        <dynamics>
+          <damping>0.002</damping>
+          <friction>0.005</friction>
+        </dynamics>
+      </axis>
+    </joint>
+
+  </model>
+</sdf>

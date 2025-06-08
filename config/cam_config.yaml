@@ -1,0 +1,58 @@
+%YAML:1.0
+
+# === SENSOR SELECTION ===
+Sensor: "Monocular"    # matches rosrun orb_slam3_ros Mono
+
+# === YAML FORMAT VERSION ===
+File: "1"              # required for the new-style parser
+
+# === CAMERA MODEL ===
+Camera.type: "PinHole" # supported types: PinHole, KannalaBrandt8, Rectified
+
+# === IMAGE PARAMETERS ===
+Camera.width: 640
+Camera.height: 480
+Camera.fps: 20.0
+Camera.RGB: 1          # 1 = RGB, 0 = BGR or grayscale
+
+# === INTRINSIC PARAMETERS ===
+# Computed from HFOV=1.0472 rad over 640px width (principal point at image center)
+Camera.fx: 554.26
+Camera.fy: 554.26
+Camera.cx: 320.00
+Camera.cy: 240.00
+
+# === DISTORTION COEFFICIENTS ===
+# Default Gazebo pinhole has no distortion—set to zero
+Camera.k1: 0.0
+Camera.k2: 0.0
+Camera.p1: 0.0
+Camera.p2: 0.0
+Camera.k3: 0.0
+
+# === ROS TOPICS ===
+# These names must match your Gazebo node’s published topics
+Camera.topic:            "/image_raw"
+Camera.camera_info_topic: "/camera_info"
+
+# === SYSTEM PARAMETERS ===
+System.maxDepth: 50.0    # ignore map points beyond this distance (meters)
+
+# === ORB EXTRACTOR PARAMETERS ===
+ORBextractor.nFeatures:    2000
+ORBextractor.scaleFactor:  1.2
+ORBextractor.nLevels:      8
+ORBextractor.iniThFAST:    20
+ORBextractor.minThFAST:    7
+
+# === VIEWER PARAMETERS ===
+Viewer.KeyFrameSize:      0.05
+Viewer.KeyFrameLineWidth: 1.0
+Viewer.GraphLineWidth:    0.9
+Viewer.PointSize:         2.0
+Viewer.CameraSize:        0.08
+Viewer.CameraLineWidth:   3.0
+Viewer.ViewpointX:        0.0
+Viewer.ViewpointY:       -0.7
+Viewer.ViewpointZ:       -1.8
+Viewer.ViewpointF:       500.0

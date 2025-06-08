@@ -1,0 +1,69 @@
+<?xml version="1.0"?>
+<robot name="sliping_robot_motor" xmlns:xacro="http://ros.org/wiki/xacro">
+  <!-- Base link -->
+  <link name="base_link">
+    <inertial>
+      <mass value="5.0"/>
+      <origin xyz="0 0 0"/>
+      <inertia ixx="0.25" ixy="0" ixz="0" iyy="0.25" iyz="0" izz="0.25"/>
+    </inertial>
+    <visual>
+      <geometry>
+        <box size="0.8 0.4 0.2"/>
+      </geometry>
+    </visual>
+    <collision>
+      <geometry>
+        <box size="0.8 0.4 0.2"/>
+      </geometry>
+    </collision>
+  </link>
+
+  <!-- Wheel macro -->
+  <xacro:macro name="wheel" params="name x y">
+    <link name="${name}_wheel">
+      <inertial>
+        <mass value="0.1"/>
+        <origin xyz="0 0 0"/>
+        <inertia ixx="0.0007" ixy="0" ixz="0" iyy="0.00013" iyz="0" izz="0.0007"/>
+      </inertial>
+      <visual>
+        <geometry>
+          <cylinder radius="0.05" length="0.02"/>
+        </geometry>
+        <origin rpy="-1.5708 0 0"/>
+      </visual>
+      <collision>
+        <geometry>
+          <cylinder radius="0.05" length="0.02"/>
+        </geometry>
+        <origin rpy="-1.5708 0 0"/>
+      </collision>
+    </link>
+
+    <joint name="${name}_joint" type="continuous">
+      <parent link="base_link"/>
+      <child link="${name}_wheel"/>
+      <origin xyz="${x} ${y} 0.05" rpy="0 0 0"/>
+      <axis xyz="0 0 1"/>
+      <limit effort="100" velocity="100"/>
+      <dynamics damping="0.005" friction="0.01"/>
+    </joint>
+
+    <transmission name="${name}_trans">
+      <type>transmission_interface/SimpleTransmission</type>
+      <actuator name="${name}_motor">
+        <mechanicalReduction>1</mechanicalReduction>
+      </actuator>
+      <joint name="${name}_joint">
+        <hardwareInterface>EffortJointInterface</hardwareInterface>
+      </joint>
+    </transmission>
+  </xacro:macro>
+
+  <!-- Four wheels -->
+  <xacro:wheel name="front_left"  x="0.15"  y=" 0.2"/>
+  <xacro:wheel name="front_right" x="0.15"  y="-0.2"/>
+  <xacro:wheel name="rear_left"   x="-0.35" y=" 0.2"/>
+  <xacro:wheel name="rear_right"  x="-0.35" y="-0.2"/>
+</robot>

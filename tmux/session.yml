@@ -1,0 +1,48 @@
+# do not modify these
+root: ./
+name: simulation
+socket_name: mrs
+
+startup_window: roscore
+
+windows:
+  - roscore:
+      layout: tiled
+      panes:
+        - roscore
+  - gazebo:
+      layout: tiled
+      panes:
+        - |
+          export GAZEBO_RESOURCE_PATH=$GAZEBO_RESOURCE_PATH:$(pwd)/../
+          export GAZEBO_MODEL_PATH=$GAZEBO_MODEL_PATH:$(pwd)/../models
+          # Wait for roscore to be running
+          while ! rosnode list > /dev/null 2>&1; do
+            echo "Waiting for roscore to start..."
+            sleep 1
+          done
+          sleep 10
+          roslaunch tracker_control ground.launch
+        - |
+          history -s "rostopic pub /setpoint_position std_msgs/Float32 'data: 2.0'"
+          
+  - camera_image:
+      layout: tiled
+      panes:
+        - rosrun rqt_image_view rqt_image_view
+  
+  - rviz:
+      layout: tiled
+      panes:
+        - rviz -d $(pwd)/../config/rviz_orb.rviz
+
+  - plotjuggler:
+      layout: tiled
+      panes:
+        - |
+          # Wait for roscore to be running
+          while ! rosnode list > /dev/null 2>&1; do
+            echo "Waiting for roscore to start..."
+            sleep 1
+          done
+          rosrun plotjuggler plotjuggler
