@@ -75,12 +75,12 @@ latest_image = None
 
 
 old_position = Point(0, 0, 0)
-old_enc = 0
+old_enc = (0, 0)
 old_enc_wheel = 0
-old_height = 0
+old_height = 1
 old_width = 0
 
-latest_enc = None
+latest_enc = (0, 0)
 position_target = 4
 
 
@@ -108,7 +108,7 @@ def encoder_callback(msg):
     global latest_enc
     try:
         # Save the odometry message to the global variable
-        latest_enc = msg.data
+        latest_enc = (msg.data, rospy.get_time())
         #rospy.loginfo(f"Odometry updated: Position=({msg.pose.pose.position.x}, {msg.pose.pose.position.y}, {msg.pose.pose.position.z})")
     except Exception as e:
         rospy.logerr(f"Error processing encoder: {e}")
@@ -165,10 +165,10 @@ if __name__ == "__main__":
     #detector = ObjectDetector()
 
     f = 1*554.26  # focal length 
-    H0, Z0 = 0.8, 2.8  # initial guesses
+    H0, Z0 = 1.2, 2.8  # initial guesses
     P0 = np.diag([0.5**2, 1**2])  # initial uncertainty
-    Q = np.diag([(0.02)**2, (0.8)**2]) # process noise 
-    R = np.diag([3.0**2, (4)**2]) # measurement of height and depth noise variance 
+    Q = np.diag([(0.02)**2, (0.4)**2]) # process noise 
+    R = np.diag([4.0**2, (6)**2]) # measurement of height and depth noise variance 
 
     ekf = EKFHeightDepth(f, H0, Z0, P0, Q, R)
 
@@ -182,6 +182,8 @@ if __name__ == "__main__":
 
     H_est, Z_est = H0, Z0
 
+    image_wheel_dz = 0
+
     rate = rospy.Rate(10)
 
     try:
@@ -189,7 +191,25 @@ if __name__ == "__main__":
 
             rate.sleep()
             depth_pub.publish(depth_msg)
-            if latest_image is not None:
+
+
+            dz = -((2*3.141592*0.05*0.8)/(4096))*(latest_enc[0] - old_enc[0]) #-((2*3.141592*0.05*0.9)/(4096))*(latest_enc[0] - old_enc[0])
+
+            old_enc = latest_enc
+
+            # displacement since last image update
+            image_wheel_dz += dz
+
+
+            # prediction step, should heppen almost every loop
+            #if abs(dz) > 0:
+            #    ekf.predict(dz)
+            #    (H_est, Z_est), P_est = ekf.current_state()
+                #print(f"current state: H_est={H_est:.2f}, Z_est={Z_est:.2f}, p={P_est} (P)")
+            
+                
+            # image height and depth updates
+            if abs(image_wheel_dz) > 0.1 and latest_image is not None:
 
                 keypoints, descriptors = orb.detectAndCompute(latest_image, None)
                 #rospy.loginfo(f"ORB feature extraction applied! Found {len(keypoints)} keypoints.")
@@ -238,24 +258,16 @@ if __name__ == "__main__":
 
                     height = y_max - y_min
 
-                    dz = -((2*3.141592*0.05)/(4096))*(latest_enc - old_enc)
-                    dz_wheel = -((2*3.141592*0.05)/(4096))*(latest_enc - old_enc_wheel)
-                    #print(f"dz: {dz} {latest_enc - old_enc} {latest_enc}")
-                    #print(f"pos {latest_position.x} {latest_position.y} {latest_position.z} from {old_position.x} {old_position.y} {old_position.z}")
-                    if abs(dz) > 0.1 and abs(old_height-height) > 2:
-
-                        ekf.predict(dz)
-                        ekf.update(height, height/(abs(old_height-height)/abs(dz)))
+                    if abs(old_height-height) > 2:
+                        ekf.predict(image_wheel_dz)
+                        ekf.update(height, height/(abs(old_height-height)/abs(image_wheel_dz)))
                         (H_est, Z_est), P_est = ekf.current_state()
-                        print(f"current state: H_est={H_est:.2f}, Z_est={Z_est:.2f} (A)")
 
+                        print(f"current state: H_est={H_est:.2f}, Z_est={Z_est:.2f}, dz={image_wheel_dz} est_dz={H_est*f*((1/old_height)-(1/height))} (H)")
                         old_height = height
-                        old_enc = latest_enc
-                        old_enc_wheel = latest_enc
-                    #elif abs(dz_wheel) > 0.05:
-                    #    ekf.predict(dz_wheel)
-                    #    old_enc_wheel = latest_enc
-                    #    (H_est, Z_est), P_est = ekf.current_state()
+                        image_wheel_dz = 0.0
+            
+            
 
             depth_msg.data = -1*Z_est - 0.5 -0.4
             depth_pub.publish(depth_msg)

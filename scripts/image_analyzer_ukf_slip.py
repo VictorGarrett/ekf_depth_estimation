@@ -59,215 +59,85 @@ def image_callback(msg):
         rospy.logerr(f"Error processing image: {e}")
 
 
-class EKFHeightDepth:
-    def __init__(self, f, H0, Z0, a0, P0, Q, R):
-        # camera focal length
+class UKFHeightDepth:
+    def __init__(self, f, H0, Z0, a0, P0, Q, R, alpha=0.5, beta=2.0, kappa=0.0):
         self.f = f
-        # state vector
+        self.n = 3  # number of states: H, Z, a
         self.x = np.array([H0, Z0, a0], dtype=float)
-        # state covariance
         self.P = P0.copy()
-        # process covariance
         self.Q = Q.copy()
-        # measurement covariance
         self.R = R.copy()
 
-        #self.Q_multiplier = np.array([8, 8, 5], dtype=float)
-        self.Q_multiplier = np.array([1.8, 1.3, 0.3], dtype=float)
-        self.multiplier_decay_rate = 0.95
+        # UKF parameters
+        self.alpha = alpha
+        self.beta = beta
+        self.kappa = kappa
+        self.lambda_ = alpha**2 * (self.n + kappa) - self.n
 
+        # Weights
+        self.Wm = np.zeros(2 * self.n + 1)
+        self.Wc = np.zeros(2 * self.n + 1)
+        self.Wm[0] = self.lambda_ / (self.n + self.lambda_)
+        self.Wc[0] = self.Wm[0] + (1 - alpha**2 + beta)
+        self.Wm[1:] = self.Wc[1:] = 1 / (2 * (self.n + self.lambda_))
+
+    def _generate_sigma_points(self, x, P):
+        sigma_pts = np.zeros((2 * self.n + 1, self.n))
+        sigma_pts[0] = x
+        sqrt_P = np.linalg.cholesky((self.n + self.lambda_) * P)
+        for i in range(self.n):
+            sigma_pts[i + 1] = x + sqrt_P[:, i]
+            sigma_pts[self.n + i + 1] = x - sqrt_P[:, i]
+        return sigma_pts
+
+    def _fx(self, x, delta_Z):
+        H, Z, a = x
+        Z_new = Z + a * delta_Z
+        return np.array([H, Z_new, a])
+
+    def _hx(self, x):
+        H, Z, a = x
+        h = self.f * H / Z
+        z_est = Z / a
+        return np.array([h, z_est])
 
     def predict(self, delta_Z):
-        u = np.array([0.0, delta_Z, 0.0])
-        _, _, a_pred = self.x
+        sigmas = self._generate_sigma_points(self.x, self.P)
+        sigmas_pred = np.array([self._fx(s, delta_Z) for s in sigmas])
 
-        self.x = self.x + u*a_pred
+        self.x = np.sum(self.Wm[:, None] * sigmas_pred, axis=0)
 
-        F_jac = np.array([[1.0, 0.0   , 0.0    ],
-                          [0.0, 1.0   , delta_Z],
-                          [0.0, 0.0   , 1.0    ]
-                          ])
+        self.P = self.Q.copy()
+        for i in range(2 * self.n + 1):
+            dx = sigmas_pred[i] - self.x
+            self.P += self.Wc[i] * np.outer(dx, dx)
 
-        self.P = F_jac @ self.P @ F_jac.T + self.Q * (np.array([1, 1, 1], dtype=float)+self.Q_multiplier)
-        self.Q_multiplier *= self.multiplier_decay_rate
+        self._sigmas_pred = sigmas_pred  # cache for update
 
     def update(self, h_meas, z_meas):
-        H_pred, Z_pred, a_pred = self.x
+        z_measured = np.array([h_meas, z_meas])
+        sigmas_z = np.array([self._hx(s) for s in self._sigmas_pred])
 
-        # measured vector
-        z_vector = np.array([h_meas, z_meas])
+        z_pred = np.sum(self.Wm[:, None] * sigmas_z, axis=0)
 
-        # h prediction from state
-        h_pred = self.f * H_pred / Z_pred
-        # predicted vector
-        z_pred_vec = np.array([h_pred, Z_pred/a_pred])
+        S = self.R.copy()
+        for i in range(2 * self.n + 1):
+            dz = sigmas_z[i] - z_pred
+            S += self.Wc[i] * np.outer(dz, dz)
 
-        # measurement Jacobian
-        H_jac = np.array([
-                            [ self.f / Z_pred,  -self.f * H_pred / (Z_pred**2), 0.0                 ],  
-                            [ 0.0            ,  1/a_pred                      , -Z_pred/(a_pred**2) ] 
-                        ])
+        Pxz = np.zeros((self.n, 2))
+        for i in range(2 * self.n + 1):
+            dx = self._sigmas_pred[i] - self.x
+            dz = sigmas_z[i] - z_pred
+            Pxz += self.Wc[i] * np.outer(dx, dz)
 
-        # innovation
-        y = z_vector - z_pred_vec
-        rospy.loginfo(f"Innovation: {y}")
-        
-        print(f"z vec: {z_vector} z pred vec: {z_pred_vec} test={h_meas*z_meas/self.f}")
-        try:
-            inov_vector_msg = Vector3()
-            inov_vector_msg.x = y[0]  # Innovation in height
-            inov_vector_msg.y = y[1]  # Innovation in depth
-            inov_vector_msg.z = 0.0   # Placeholder for unused dimension
-            inov_pub.publish(inov_vector_msg)
-        except Exception as e:
-            rospy.logerr(f"Error publishing innovation vector: {e}")
-        # innovation covariance
-        S = H_jac @ self.P @ H_jac.T + self.R[:2, :2]
-
-        # kalman gain
-        K = self.P @ H_jac.T @ np.linalg.inv(S)
-
-        print(f"before update: {self.x}")
-        # state update
-        self.x = self.x + K @ y
-        print(f"after update: {self.x}")
-
-        # covariance update
-        I = np.eye(3)
-        self.P = (I - K @ H_jac) @ self.P
-
-    def update_it(self, h_meas, z_meas, max_iter=40, epsilon=1e-5):
-        z_vector = np.array([h_meas, z_meas])
-        x_updated = self.x.copy()
-        P_updated = self.P.copy()
-
-        for i in range(max_iter):
-            H_pred, Z_pred, a_pred = x_updated
-
-            if Z_pred <= 0 or a_pred <= 0:
-                rospy.logwarn("Invalid state encountered during IEKF iteration.")
-                break
-
-            # Measurement prediction
-            h_pred = self.f * H_pred / Z_pred
-            z_pred = Z_pred / a_pred
-            z_pred_vec = np.array([h_pred, z_pred])
-
-            # Innovation
-            y = z_vector - z_pred_vec
-
-            # Jacobian
-            H_jac = np.array([
-                [ self.f / Z_pred, -self.f * H_pred / (Z_pred**2), 0.0 ],
-                [ 0.0,              1.0 / a_pred,                 -Z_pred / (a_pred**2) ]
-            ])
-
-            # Innovation covariance
-            S = H_jac @ P_updated @ H_jac.T + self.R[:2, :2]
-            if np.linalg.cond(S) > 1e12:
-                rospy.logwarn("Innovation covariance S is ill-conditioned.")
-                break
-
-            # Kalman gain
-            K = P_updated @ H_jac.T @ np.linalg.inv(S)
-
-            # Compute update
-            delta_x = K @ y
-            new_x = x_updated + 0.5*delta_x
-
-            # Check convergence
-            if np.linalg.norm(delta_x) < epsilon:
-                rospy.loginfo(f"IEKF converged in {i+1} iterations.")
-                x_updated = new_x
-                break
-
-            x_updated = new_x
-
-        # Finalize update
-        self.x = x_updated
-
-        # Final Jacobian and Kalman gain for covariance update
-        H_pred, Z_pred, a_pred = self.x
-        H_jac = np.array([
-            [ self.f / Z_pred, -self.f * H_pred / (Z_pred**2), 0.0 ],
-            [ 0.0,              1.0 / a_pred,                 -Z_pred / (a_pred**2) ]
-        ])
-        S = H_jac @ self.P @ H_jac.T + self.R[:2, :2]
-        K = self.P @ H_jac.T @ np.linalg.inv(S)
-
-        # Optional: one last state correction (can be omitted if converged)
-        final_y = z_vector - np.array([self.f * self.x[0] / self.x[1], self.x[1] / self.x[2]])
-        self.x = self.x + K @ final_y
-
-        # Covariance update
-        I = np.eye(3)
-        self.P = (I - K @ H_jac) @ self.P
-    
-    def update_a(self, a_meas):
-        H_pred, Z_pred, a_pred = self.x
-
-        # measured vector
-        z_vector = np.array([a_meas])
-
-        # predicted vector
-        z_pred_vec = np.array([a_pred])
-
-        # measurement Jacobian
-        H_jac = np.array([
-                            [ 0.0            ,  0.0                           ,  1.0                ] 
-                        ])
-
-        # innovation
-        y = z_vector - z_pred_vec
-        # innovation covariance
-        S = H_jac @ self.P @ H_jac.T + self.R[2, 2]
-
-        # kalman gain
-        K = self.P @ H_jac.T @ np.linalg.inv(S)
-
-        # state update
-        self.x = self.x + K @ y
-
-        # covariance update
-        I = np.eye(3)
-        self.P = (I - K @ H_jac) @ self.P
-
-    def update_hz(self, h_meas, z_meas):
-        H_pred, Z_pred, a_pred = self.x
-
-        # measured vector
-        z_vector = np.array([h_meas, z_meas])
-
-        # h prediction from state
-        h_pred = self.f * H_pred / Z_pred
-        # predicted vector
-        z_pred_vec = np.array([h_pred, Z_pred/a_pred])
-
-        # measurement Jacobian
-        H_jac = np.array([
-                            [ self.f / Z_pred,  -self.f * H_pred / (Z_pred**2), 0.0                 ],  
-                            [ 0.0            ,  1/a_pred                      , -Z_pred/(a_pred**2) ]
-                        ])
-
-        # innovation
-        y = z_vector - z_pred_vec
-        print(f"z vec: {z_vector} z pred vec: {z_pred_vec} test={h_meas*z_meas/self.f}")
-        # innovation covariance
-        S = H_jac @ self.P @ H_jac.T + self.R[:2, :2]
-
-        # kalman gain
-        K = self.P @ H_jac.T @ np.linalg.inv(S)
-
-        # state update
-        self.x = self.x + K @ y
-
-        # covariance update
-        I = np.eye(3)
-        self.P = (I - K @ H_jac) @ self.P
+        K = Pxz @ np.linalg.inv(S)
+        innovation = z_measured - z_pred
+        self.x = self.x + K @ innovation
+        self.P = self.P - K @ S @ K.T
 
     def current_state(self):
-        """Returns current estimates of (H, Z) and covariance P."""
-        return self.x.copy(), self.P.copy()
+        return self.x.copy()
 
 
 
@@ -331,19 +201,19 @@ if __name__ == "__main__":
 
     f = 1*554.26  # focal length 
     #H0, Z0, a0 = 1.08, 3.2, 0.9  # initial guesses (these work well somehow)
-    #0.38634978 0.27903039 0.06439163
+
     #these work REALLY well
     #H0, Z0, a0 = 0.92, 3.2, 0.7  # initial guesses
     #P0 = np.diag([0.7**2, 0.5**2, 0.3**2])  # initial uncertainty
-    #Q = np.diag([4e-4*1.386, 8e-2*1.279, 2e-4*1.064]) # process noise 
-    #R = np.diag([3.0**2, 10.0**2, 0.3**2]) # measurement of height and depth noise variance 
+    #Q = np.diag([2e-3, 8e-2, 2e-3]) # process noise 
+    #R = np.diag([3.0**2, 3.0**2, 0.3**2]) # measurement of height and depth noise variance 
 
-    H0, Z0, a0 = 0.92, 3.2, 0.7  # initial guesses
-    P0 = np.diag([0.7**2, 0.5**2, 0.3**2])  # initial uncertainty
-    Q = np.diag([8e-4*1.386, 6e-2*1.279, 2e-4*1.064]) # process noise 
-    R = np.diag([3.0**2, 8.0**2, 0.3**2]) # measurement of height and depth noise variance 
+    H0, Z0, a0 = 1, 3, 0.89  # initial guesses
+    P0 = np.diag([1.0**2, 0.5**2, 0.5**2])  # initial uncertainty
+    Q = np.diag([5e-5, 6e-5, 5e-5])  # small, but not zero
+    R = np.diag([1.5, 2])  # measurement of height and depth noise variance 
 
-    ekf = EKFHeightDepth(f, H0, Z0, a0, P0, Q, R)
+    ekf = UKFHeightDepth(f, H0, Z0, a0, P0, Q, R)
 
     depth_msg = Float32()
     depth_msg.data = -3
@@ -469,13 +339,14 @@ if __name__ == "__main__":
 
                     if abs(old_height-height) > 2:
                         ekf.predict(image_wheel_dz)
-                        ekf.update_it(height, height/(abs(old_height-height)/abs(image_wheel_dz)), 20)
+
+                        ekf.update(height, height/(abs(old_height-height)/abs(image_wheel_dz)))
                         
-                        (H_est, Z_est, a_est), P_est = ekf.current_state()
+                        (H_est, Z_est, a_est) = ekf.current_state()
 
                         old_height = height
                         image_wheel_dz = 0.0
-                        print(f"current state: H_est={H_est:.2f}, Z_est={Z_est:.2f}, a_est={a_est:.2f}, Q_mult={ekf.Q_multiplier} (H)")
+                        print(f"current state: H_est={H_est:.2f}, Z_est={Z_est:.2f}, a_est={a_est:.2f} (H)")
             
             
 

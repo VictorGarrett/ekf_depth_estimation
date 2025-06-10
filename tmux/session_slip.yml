@@ -40,7 +40,7 @@ windows:
               sleep 0.5
             done
             echo "Gazebo is running!"
-            rosrun tracker_control image_analyzer_ekf_slip.py
+            rosrun tracker_control image_analyzer_ekf_logslip.py
         - |
             history -s "rostopic pub /setpoint_position std_msgs/Float32 'data: 2.0'"       
   - camera_image:
