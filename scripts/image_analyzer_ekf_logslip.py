@@ -62,83 +62,138 @@ def image_callback(msg):
 class EKFHeightDepth:
     def __init__(self, f, H0, Z0, a0, P0, Q, R):
         self.f = f
-        # State: log(fH), log(Z), log(a)
-        self.x = np.log(np.array([f * H0, Z0, a0], dtype=float))
+        # x = [log(fH), log(Z), 20*log10(a)]
+        self.x = np.array([
+            np.log(f * H0),
+            np.log(Z0),
+            20 * np.log10(a0)
+        ], dtype=float)
+
         self.P = P0.copy()
         self.Q = Q.copy()
         self.R = R.copy()
 
-        self.Q_multiplier = np.array([1.8, 1.3, 0.3], dtype=float)
-        self.multiplier_decay_rate = 0.95
+        self.Q_multiplier = np.array([4, 2, 3], dtype=float)
+        self.multiplier_decay_rate = 0.98
 
     def predict(self, delta_Z):
-        Hf_log, Z_log, a_log = self.x
-        a = np.exp(a_log)
-        Z = np.exp(Z_log)
+        Hf_log, Z_log, a_log10_scaled = self.x
 
-        # Update Z in log-space using the additive motion model
+        Z = np.exp(Z_log)
+        a = 10 ** (a_log10_scaled / 20.0)  # Inverter escala
+
         Z_new = Z + delta_Z * a
         self.x[1] = np.log(Z_new)  # update log(Z)
 
-        # Compute Jacobian of the motion model
         F_jac = np.eye(3)
         F_jac[1, 1] = Z / Z_new
-        F_jac[1, 2] = delta_Z * a / Z_new
+        F_jac[1, 2] = (delta_Z * a * np.log(10)) / (20 * Z_new)
 
-        # Update covariance
         Q_scaled = self.Q * (np.ones(3) + self.Q_multiplier)
         self.P = F_jac @ self.P @ F_jac.T + Q_scaled
         self.Q_multiplier *= self.multiplier_decay_rate
 
     def update(self, h_meas, z_meas):
-        # Skip update if measurements are invalid
         if h_meas <= 0 or z_meas <= 0:
             rospy.logwarn("Non-positive measurement encountered; skipping update.")
             return
 
-        # Convert measurements to log-space
         z_log = np.array([
             np.log(h_meas),
             np.log(z_meas)
         ])
 
-        # Measurement prediction in log-space
-        Hf_log, Z_log, a_log = self.x
-        h_pred_log = Hf_log - Z_log           # log(h) = log(fH) - log(Z)
-        z_pred_log = Z_log - a_log            # log(z) = log(Z) - log(a)
+
+        Hf_log, Z_log, a_log10_scaled = self.x
+        h_pred_log = Hf_log - Z_log
+        z_pred_log = Z_log - np.log(10 ** (a_log10_scaled / 20.0))
+
         z_pred = np.array([h_pred_log, z_pred_log])
 
-        # Measurement Jacobian
+        # Jacobiana da medição
         H_jac = np.array([
             [1.0, -1.0,  0.0],
-            [0.0,  1.0, -1.0]
+            [0.0,  1.0, -np.log(10) / 20.0]
         ])
 
-        # Innovation
         y = z_log - z_pred
+        inov_pub.publish(Vector3(y[0], y[1], np.linalg.norm(y)))
 
-        # Innovation covariance
         S = H_jac @ self.P @ H_jac.T + self.R[:2, :2]
         if np.linalg.cond(S) > 1e12:
             rospy.logwarn("Innovation covariance S is ill-conditioned.")
             return
 
-        # Kalman gain
         K = self.P @ H_jac.T @ np.linalg.inv(S)
-
-        print(K)
-        # State update
         self.x = self.x + K @ y
-
-        # Covariance update
         I = np.eye(3)
         self.P = (I - K @ H_jac) @ self.P
 
     def current_state(self):
-        """Returns current estimates of (H, Z, a) and covariance P."""
-        Hf, Z, a = np.exp(self.x)
+        Hf = np.exp(self.x[0])
+        Z = np.exp(self.x[1])
+        a = 10 ** (self.x[2] / 20.0)
         H = Hf / self.f
         return np.array([H, Z, a]), self.P.copy()
+    
+    def check_observability(self, delta_Z, tol=1e-8):
+        """
+        Computes the observability matrix at current EKF state and evaluates its rank,
+        condition number, and singular values to assess numerical observability.
+
+        Parameters:
+        - delta_Z: control input (displacement in depth)
+        - tol: tolerance for rank estimation
+        - verbose: whether to print details
+
+        Returns:
+        - O: observability matrix
+        - rank: estimated matrix rank
+        - cond_number: condition number (L2)
+        - singular_values: full list of singular values
+        """
+
+        # Current log-state
+        x1, x2, x3 = self.x
+        Z = np.exp(x2)
+        a = 10**(x3/20)
+        Z_new = Z + delta_Z * a
+
+        # Linearized dynamics Jacobian (F)
+        F = np.eye(3)
+        F[1, 1] = Z / Z_new
+        F[1, 2] = (delta_Z * np.log(10)) / (20 * (10**(-x3/20)*Z + delta_Z))
+
+        # Measurement Jacobian (H)
+        H = np.array([
+            [1.0, -1.0,  0.0],
+            [0.0,  1.0, -np.log(10) / 20.0]
+        ])
+
+        # Observability matrix: [H; H*F; H*F^2]
+        O = np.vstack([
+            H,
+            H @ F,
+            H @ F @ F
+        ])
+
+        # Normalization for numerical robustness
+        O_normalized = O / np.linalg.norm(O, ord='fro')
+
+        # Singular values and condition number
+        U, S, Vt = np.linalg.svd(O_normalized)
+        cond_number = S[0] / S[-1] if S[-1] > 0 else np.inf
+
+        # Numerical rank (with tolerance)
+        rank = np.sum(S > tol)
+
+        print("\n[EKF] Observability Matrix:\n", O)
+        print("[EKF] Normalized Observability Matrix (Frobenius):\n", O_normalized)
+        print("[EKF] Singular values:", S)
+        print("[EKF] Condition number:", cond_number)
+        print("[EKF] Estimated Rank:", rank)
+
+        return O, rank, cond_number, S
 
 
 
@@ -201,18 +256,24 @@ if __name__ == "__main__":
     last_imu_update_time = rospy.get_time()
 
     f = 1*554.26  # focal length 
-    #H0, Z0, a0 = 1.08, 3.2, 0.9  # initial guesses (these work well somehow)
-    #0.38634978 0.27903039 0.06439163
     #these work REALLY well
-    #H0, Z0, a0 = 0.92, 3.2, 0.7  # initial guesses
-    #P0 = np.diag([0.7**2, 0.5**2, 0.3**2])  # initial uncertainty
-    #Q = np.diag([4e-3*1.386, 8e-2*1.279, 2e-4*1.064]) # process noise 
-    #R = np.diag([3.0**2, 10.0**2, 0.3**2]) # measurement of height and depth noise variance 
+    #H0, Z0, a0 = 0.8, 2.6, 0.7  # initial guesses
+    #P0 = np.diag([2.7**2, 0.5**2, 1.3**2])  # initial uncertainty
+    #Q = np.diag([8e-3*1.386, 6e-2*1.279, 9e-3*1.064]) # process noise 
+    #R = np.diag([1.0**2, 1.6**2, 0.3**2]) # measurement of height and depth noise variance  
 
-    H0, Z0, a0 = 1, 3.0, 0.89  # initial guesses
-    P0 = np.diag([2.7**2, 0.5**2, 1.3**2])  # initial uncertainty
-    Q = np.diag([8e-3*1.386, 6e-2*1.279, 9e-3*1.064]) # process noise 
-    R = np.diag([2.0**2, 8.0**2, 0.3**2]) # measurement of height and depth noise variance 
+    H0, Z0, a0 = 0.8, 2.6, 0.7  # initial guesses
+    P0 = np.diag([3.7**2, 3.5**2, 4.3**2])  # initial uncertainty
+    Q = np.diag([2e-2*1.386, 7e-1*1.279, 8e-2*1.064]) # process noise 
+
+    # turns out that correlation must be acoounted for (who would have thought)
+    sigma_h = 0.2   # std dev of log(h)
+    sigma_z = 3   # std dev of log(z)
+    rho = 0.0       # correlation
+    R = np.array([
+        [sigma_h**2,            rho * sigma_h * sigma_z],
+        [rho * sigma_h * sigma_z, sigma_z**2]
+    ]) 
 
     ekf = EKFHeightDepth(f, H0, Z0, a0, P0, Q, R)
 
@@ -240,7 +301,7 @@ if __name__ == "__main__":
 
             rate.sleep()
             depth_pub.publish(depth_msg)
-            position_target = 3 + math.sin(0.6* rospy.get_time()) + 0.7*math.sin(0.2* rospy.get_time())
+            position_target = 3.0 + 0.9*math.sin(0.7* rospy.get_time()) + 0.5*math.sin(0.2* rospy.get_time()) + 0.3*math.sin(0.3* rospy.get_time())
 
 
             dz = -((2*3.141592*0.05)/(4096))*(latest_enc[0] - old_enc[0])
@@ -339,6 +400,7 @@ if __name__ == "__main__":
                     height = y_max - y_min
 
                     if abs(old_height-height) > 2:
+                        ekf.check_observability(image_wheel_dz)
                         ekf.predict(image_wheel_dz)
                         ekf.update(height, height/(abs(old_height-height)/abs(image_wheel_dz)))
                         

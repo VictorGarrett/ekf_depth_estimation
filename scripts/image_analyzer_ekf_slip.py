@@ -268,6 +268,64 @@ class EKFHeightDepth:
     def current_state(self):
         """Returns current estimates of (H, Z) and covariance P."""
         return self.x.copy(), self.P.copy()
+    
+    def check_observability(self, delta_Z, tol=1e-8):
+        """
+        Computes the observability matrix at current EKF state and evaluates its rank,
+        condition number, and singular values to assess numerical observability.
+
+        Parameters:
+        - delta_Z: control input (displacement in depth)
+        - tol: tolerance for rank estimation
+        - verbose: whether to print details
+
+        Returns:
+        - O: observability matrix
+        - rank: estimated matrix rank
+        - cond_number: condition number (L2)
+        - singular_values: full list of singular values
+        """
+
+        # Current log-state
+        H, Z, a = self.x
+
+        # Linearized dynamics Jacobian (F)
+        F = np.array([
+            [1.0, 0.0, 0.0],
+            [0.0, 1, delta_Z],
+            [0.0, 0.0, 1.0]
+        ])
+
+        # Measurement Jacobian (H)
+        H = np.array([
+                            [ self.f / Z,  -self.f * H / (Z**2), 0.0                 ],  
+                            [ 0.0            ,  1/Z                      , -Z/(a**2) ] 
+                        ])
+
+        # Observability matrix: [H; H*F; H*F^2]
+        O = np.vstack([
+            H,
+            H @ F,
+            H @ F @ F
+        ])
+
+        # Normalization for numerical robustness
+        O_normalized = O / np.linalg.norm(O, ord='fro')
+
+        # Singular values and condition number
+        U, S, Vt = np.linalg.svd(O_normalized)
+        cond_number = S[0] / S[-1] if S[-1] > 0 else np.inf
+
+        # Numerical rank (with tolerance)
+        rank = np.sum(S > tol)
+
+        print("\n[EKF] Observability Matrix:\n", O)
+        print("[EKF] Normalized Observability Matrix (Frobenius):\n", O_normalized)
+        print("[EKF] Singular values:", S)
+        print("[EKF] Condition number:", cond_number)
+        print("[EKF] Estimated Rank:", rank)
+
+        return O, rank, cond_number, S
 
 
 
@@ -468,6 +526,7 @@ if __name__ == "__main__":
                     height = y_max - y_min
 
                     if abs(old_height-height) > 2:
+                        ekf.check_observability(image_wheel_dz)
                         ekf.predict(image_wheel_dz)
                         ekf.update_it(height, height/(abs(old_height-height)/abs(image_wheel_dz)), 20)
                         

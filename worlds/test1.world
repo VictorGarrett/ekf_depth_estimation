@@ -11,10 +11,14 @@
           <iters>200</iters>
           <sor>1.3</sor>
         </solver>
-        <global_erp>0.1</global_erp>
-        <global_cfm>1e-5</global_cfm>
+        <global_erp>0.002</global_erp>
+        <global_cfm>1e-2</global_cfm>
         <contact_surface_layer>0.001</contact_surface_layer>
         <max_contacts>16</max_contacts>
+
+        <constraints>
+          <contact_max_correcting_vel>1000.0</contact_max_correcting_vel>
+        </constraints>
       </ode>
     </physics>
     <!-- Global lighting -->

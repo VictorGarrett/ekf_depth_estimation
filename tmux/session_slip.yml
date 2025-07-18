@@ -40,18 +40,15 @@ windows:
               sleep 0.5
             done
             echo "Gazebo is running!"
-            rosrun tracker_control image_analyzer_ekf_logslip.py
+            sleep 5
+            rosrun tracker_control image_analyzer_ekf_slip_vel_absdepth_dyn.py
         - |
             history -s "rostopic pub /setpoint_position std_msgs/Float32 'data: 2.0'"       
   - camera_image:
       layout: tiled
       panes:
         - rosrun rqt_image_view rqt_image_view
-  
-  - rviz:
-      layout: tiled
-      panes:
-        - rviz -d $(pwd)/../config/rviz_orb.rviz
+
 
   - plotjuggler:
       layout: tiled

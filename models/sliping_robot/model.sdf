@@ -4,28 +4,20 @@
     <static>false</static>
     <pose>0 0 0 0 0 0</pose>
 
-    <!-- ============================
-         P3D Plugin (if you re-enable)
-         ============================ -->
     <plugin name="ground_truth_plugin" filename="libgazebo_ros_p3d.so">
       <frameName>world</frameName>
       <bodyName>base_link</bodyName>
       <topicName>ground_truth/odometry</topicName>
-      <updateRate>30</updateRate>
+      <updateRate>120</updateRate>
     </plugin>
 
-    <!-- ============================
-         BASE LINK (with sensors)
-         ============================ -->
+
     <link name="base_link">
       <selfCollide>false</selfCollide>
       <pose>0 0 0.18 0 0 0</pose>
       <inertial>
-        <mass>5.0</mass>
-        <inertia>
-          <ixx>0.25</ixx><ixy>0.0</ixy><ixz>0.0</ixz>
-          <iyy>0.25</iyy><iyz>0.0</iyz><izz>0.25</izz>
-        </inertia>
+        <mass>10.0</mass>
+        
       </inertial>
 
       <!-- Collision -->
@@ -70,7 +62,7 @@
         </material>
       </visual>
 
-      <!-- IMU Sensor -->
+      <!-- IMU Sensor 
       <sensor name="imu_sensor" type="imu">
         <pose>0.4 0 0.1 0 0 0</pose>
         <always_on>true</always_on>
@@ -82,7 +74,7 @@
           <frameName>base_link</frameName>
           <initialOrientationAsReference>false</initialOrientationAsReference>
         </plugin>
-      </sensor>
+      </sensor>-->
 
       <!-- Camera Sensor -->
       <sensor name="camera_sensor" type="camera">
@@ -92,6 +84,9 @@
           <image>
             <width>640</width>
             <height>480</height>
+
+            <!--<width>1280</width>
+            <height>960</height>-->
           </image>
           <clip>
             <near>0.05</near>
@@ -111,45 +106,31 @@
       </sensor>
     </link>
 
-    <!-- =======================================
-         FRONT-LEFT WHEEL LINK + CONTINUOUS JOINT
-         ======================================= -->
     <link name="front_left_wheel">
-      <!-- 
-           cylinder rotated −1.5708 around X so its local Z→Y.
-           Pose: x=0.15, y=+0.2, z=0.05 (just touching ground).
-      -->
+
       <pose>0.15 0.2 0.05 -1.5708 0 0</pose>
       <inertial>
-        <mass>0.1</mass>
+        <mass>1</mass>
         <inertia>
-          <ixx>0.0007</ixx>
-          <iyy>0.00013</iyy>
-          <izz>0.0007</izz>
+          <ixx>0.0006583</ixx>
+          <iyy>0.0006583</iyy>
+          <izz>0.01125</izz>
         </inertia>
       </inertial>
 
+
       <collision name="fl_collision">
-        <geometry>
-          <cylinder>
-            <radius>0.05</radius>
-            <length>0.02</length>
-          </cylinder>
-        </geometry>
+        <geometry><cylinder><radius>0.05</radius><length>0.02</length></cylinder></geometry>
         <surface>
-          <friction>
-            <ode>
-              <mu1>1</mu1>
-              <mu2>1</mu2>
-              <kp>1e8</kp>
-              <kd>1</kd>
-            </ode>
-          </friction>
+          <bounce>
+            <restitution_coefficient>0</restitution_coefficient>
+          </bounce>
+          <friction><ode><mu1>1.5</mu1><mu2>1.5</mu2></ode></friction>
           <contact>
             <ode>
-              <kp>1e6</kp>
-              <kd>1.0</kd>
-              <max_vel>0.1</max_vel>
+              <kp>1e7</kp>
+              <kd>100</kd>
+              <max_vel>0.0</max_vel>
               <min_depth>0.001</min_depth>
             </ode>
           </contact>
@@ -164,8 +145,8 @@
           </cylinder>
         </geometry>
         <material>
-          <ambient>0.3 0.3 0.3 1</ambient>
-          <diffuse>0.3 0.3 0.3 1</diffuse>
+            <ambient>0.3 0.3 0.3 1</ambient>
+            <diffuse>0.3 0.3 0.3 1</diffuse>
         </material>
       </visual>
     </link>
@@ -174,17 +155,11 @@
       <parent>base_link</parent>
       <child>front_left_wheel</child>
       <axis>
-        <!-- Because the cylinder’s local Z was rotated into Y, we roll around Y: -->
         <xyz>0 0 1</xyz>
-        <limit>
-          <effort>100000</effort>
-          <velocity>100000</velocity>
-          <lower>-1e16</lower>
-          <upper> 1e16</upper>
-        </limit>
+        <limit effort="1000" velocity="1000" />
         <dynamics>
-          <damping>0.005</damping>
-          <friction>0.01</friction>
+          <damping>0.01</damping>
+          <friction>0.0000001</friction>
         </dynamics>
       </axis>
     </joint>
@@ -207,13 +182,13 @@
       <publish_motor_joint_state>true</publish_motor_joint_state>
       <update_rate>100.0</update_rate>
 
-      <velocity_noise>0.1</velocity_noise>
+      <velocity_noise>0.0</velocity_noise>
       <motor_nominal_voltage>12.0</motor_nominal_voltage>
-      <moment_of_inertia>0.001</moment_of_inertia>
+      <moment_of_inertia>0.0001</moment_of_inertia>
       <armature_damping_ratio>0.0001</armature_damping_ratio>
-      <electromotive_force_constant>0.08</electromotive_force_constant>
+      <electromotive_force_constant>0.02</electromotive_force_constant>
       <electric_resistance>1.0</electric_resistance>
-      <electric_inductance>0.001</electric_inductance>
+      <electric_inductance>0.01</electric_inductance>
       <gear_ratio>10</gear_ratio>
       <encoder_ppr>4096</encoder_ppr>
       <rosDebugLevel>Debug</rosDebugLevel>
@@ -221,39 +196,39 @@
 
     <!-- =======================================
          FRONT-RIGHT WHEEL LINK + CONTINUOUS JOINT
-         ======================================= -->
+         =======================================--> 
     <link name="front_right_wheel">
       <pose>0.15 -0.2 0.05 -1.5708 0 0</pose>
       <inertial>
-        <mass>0.1</mass>
+        <mass>1</mass>
         <inertia>
-          <ixx>0.0007</ixx>
-          <iyy>0.00013</iyy>
-          <izz>0.0007</izz>
+          <ixx>0.0006583</ixx>
+          <iyy>0.0006583</iyy>
+          <izz>0.01125</izz>
         </inertia>
       </inertial>
 
+      <sensor name="front_right_ft_sensor" type="force_torque">
+        <always_on>1</always_on>
+        <update_rate>100</update_rate>
+        <force_torque>
+    
+          <frame>0</frame>
+        </force_torque>
+      </sensor>
+
       <collision name="fr_collision">
-        <geometry>
-          <cylinder>
-            <radius>0.05</radius>
-            <length>0.02</length>
-          </cylinder>
-        </geometry>
+        <geometry><cylinder><radius>0.05</radius><length>0.02</length></cylinder></geometry>
         <surface>
-          <friction>
-            <ode>
-              <mu1>1</mu1>
-              <mu2>1</mu2>
-              <kp>1e8</kp>
-              <kd>1</kd>
-            </ode>
-          </friction>
+          <bounce>
+            <restitution_coefficient>0</restitution_coefficient>
+          </bounce>
+          <friction><ode><mu1>1.5</mu1><mu2>1.5</mu2></ode></friction>
           <contact>
             <ode>
-              <kp>1e6</kp>
-              <kd>1.0</kd>
-              <max_vel>0.1</max_vel>
+              <kp>1e7</kp>
+              <kd>100</kd>
+              <max_vel>0.0</max_vel>
               <min_depth>0.001</min_depth>
             </ode>
           </contact>
@@ -279,20 +254,20 @@
       <child>front_right_wheel</child>
       <axis>
         <xyz>0 0 1</xyz>
-        <limit>
-          <lower>-1e16</lower>
-          <upper> 1e16</upper>
-          <effort>1000000</effort>
-          <velocity>1000</velocity>
-        </limit>
+        <limit effort="1000" velocity="1000" />
         <dynamics>
-          <damping>0.005</damping>
-          <friction>0.01</friction>
+          <damping>0.01</damping>
+          <friction>0.000001</friction>
         </dynamics>
       </axis>
+      <physics>
+        <ode>
+
+        </ode>
+      </physics>
     </joint>
 
-    <!-- DC Motor plugin for front_right_joint -->
+
     <plugin name="front_right_motor_plugin" filename="libgazebo_ros_dc_motor.so">
       <motor_shaft_joint>front_right_joint</motor_shaft_joint>
       <motor_wrench_frame>front_right_wheel</motor_wrench_frame>
@@ -308,15 +283,14 @@
       <publish_motor_joint_state>true</publish_motor_joint_state>
       <update_rate>100.0</update_rate>
 
-      <velocity_noise>0.1</velocity_noise>
+      <velocity_noise>0.0</velocity_noise>
       <motor_nominal_voltage>12.0</motor_nominal_voltage>
-      <moment_of_inertia>0.001</moment_of_inertia>
+      <moment_of_inertia>0.0001</moment_of_inertia>
       <armature_damping_ratio>0.0001</armature_damping_ratio>
-      <electromotive_force_constant>0.08</electromotive_force_constant>
+      <electromotive_force_constant>0.02</electromotive_force_constant>
       <electric_resistance>1.0</electric_resistance>
-      <electric_inductance>0.001</electric_inductance>
+      <electric_inductance>0.01</electric_inductance>
       <gear_ratio>10</gear_ratio>
-
       <encoder_ppr>4096</encoder_ppr>
       <rosDebugLevel>Debug</rosDebugLevel>
     </plugin>
@@ -330,33 +304,24 @@
       <inertial>
         <mass>0.1</mass>
         <inertia>
-          <ixx>0.0007</ixx>
-          <iyy>0.00013</iyy>
-          <izz>0.0007</izz>
+          <ixx>0.00006583</ixx>
+          <iyy>0.00006583</iyy>
+          <izz>0.0000125</izz>
         </inertia>
       </inertial>
 
       <collision name="rl_collision">
-        <geometry>
-          <cylinder>
-            <radius>0.05</radius>
-            <length>0.02</length>
-          </cylinder>
-        </geometry>
+        <geometry><cylinder><radius>0.05</radius><length>0.02</length></cylinder></geometry>
         <surface>
-          <friction>
-            <ode>
-              <mu1>0.5</mu1>
-              <mu2>0.5</mu2>
-              <kp>1e8</kp>
-              <kd>1</kd>
-            </ode>
-          </friction>
+          <bounce>
+            <restitution_coefficient>0</restitution_coefficient>
+          </bounce>
+          <friction><ode><mu1>0.5</mu1><mu2>0.5</mu2></ode></friction>
           <contact>
             <ode>
               <kp>1e6</kp>
-              <kd>1.0</kd>
-              <max_vel>0.1</max_vel>
+              <kd>1</kd>
+              <max_vel>0.0</max_vel>
               <min_depth>0.001</min_depth>
             </ode>
           </contact>
@@ -381,19 +346,22 @@
       <parent>base_link</parent>
       <child>rear_left_wheel</child>
       <axis>
-        <!-- Revolute but with huge ± limits so it can spin continuously -->
         <xyz>0 0 1</xyz>
-        <limit>
-          <lower>-1e16</lower>
-          <upper> 1e16</upper>
-          <effort>100</effort>
-          <velocity>1000</velocity>
-        </limit>
+        <limit effort="1000" velocity="1000" />
         <dynamics>
-          <damping>0.002</damping>
-          <friction>0.005</friction>
+          <!-- Critical damping to stabilize joint dynamics -->
+          <damping>0.000005</damping>
+          <friction>0.0000001</friction>
         </dynamics>
       </axis>
+      <physics>
+        <ode>
+          <!-- Enable robust, numerically stable damping 
+          <implicit_spring_damper>false</implicit_spring_damper>
+          <stopCfm>0.0</stopCfm>
+          <stopErp>0.2</stopErp>-->
+        </ode>
+      </physics>
     </joint>
 
     <!-- =======================================
@@ -404,33 +372,24 @@
       <inertial>
         <mass>0.1</mass>
         <inertia>
-          <ixx>0.0007</ixx>
-          <iyy>0.00013</iyy>
-          <izz>0.0007</izz>
+          <ixx>0.00006583</ixx>
+          <iyy>0.00006583</iyy>
+          <izz>0.0000125</izz>
         </inertia>
       </inertial>
 
       <collision name="rr_collision">
-        <geometry>
-          <cylinder>
-            <radius>0.05</radius>
-            <length>0.02</length>
-          </cylinder>
-        </geometry>
+        <geometry><cylinder><radius>0.05</radius><length>0.02</length></cylinder></geometry>
         <surface>
-          <friction>
-            <ode>
-              <mu1>0.5</mu1>
-              <mu2>0.5</mu2>
-              <kp>1e8</kp>
-              <kd>1</kd>
-            </ode>
-          </friction>
+          <bounce>
+            <restitution_coefficient>0</restitution_coefficient>
+          </bounce>
+          <friction><ode><mu1>0.5</mu1><mu2>0.5</mu2></ode></friction>
           <contact>
             <ode>
               <kp>1e6</kp>
-              <kd>1.0</kd>
-              <max_vel>0.1</max_vel>
+              <kd>1</kd>
+              <max_vel>0.0</max_vel>
               <min_depth>0.001</min_depth>
             </ode>
           </contact>
@@ -456,17 +415,21 @@
       <child>rear_right_wheel</child>
       <axis>
         <xyz>0 0 1</xyz>
-        <limit>
-          <lower>-1e16</lower>
-          <upper> 1e16</upper>
-          <effort>100</effort>
-          <velocity>1000</velocity>
-        </limit>
+        <limit effort="1000" velocity="1000" />
         <dynamics>
-          <damping>0.002</damping>
-          <friction>0.005</friction>
+          <!-- Critical damping to stabilize joint dynamics -->
+          <damping>0.000005</damping>
+          <friction>0.0000001</friction>
         </dynamics>
       </axis>
+      <physics>
+        <ode>
+          <!-- Enable robust, numerically stable damping
+          <implicit_spring_damper>false</implicit_spring_damper>
+          <stopCfm>0.0</stopCfm>
+          <stopErp>0.2</stopErp>-->
+        </ode>
+      </physics>
     </joint>
 
   </model>
