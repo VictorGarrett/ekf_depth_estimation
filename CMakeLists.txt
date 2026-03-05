@@ -1,67 +1,47 @@
-cmake_minimum_required(VERSION 3.0.2)
+cmake_minimum_required(VERSION 3.8)
 project(tracker_control)
 
-## Compile as C++11, supported in ROS Kinetic and newer
-# add_compile_options(-std=c++11)
+# Default to C++14 if any C++ is added later
+if(NOT CMAKE_CXX_STANDARD)
+  set(CMAKE_CXX_STANDARD 14)
+endif()
 
-## Find catkin macros and libraries
-find_package(catkin REQUIRED COMPONENTS
-  roscpp
-  rospy
-  std_msgs
-  geometry_msgs
-  nav_msgs
-  std_srvs
-  tf2_ros
-  tf2_geometry_msgs
-  sensor_msgs
-  cv_bridge
-  #message_generation
-  #mavros_msgs
+if(CMAKE_COMPILER_IS_GNUCXX OR CMAKE_CXX_COMPILER_ID MATCHES "Clang")
+  add_compile_options(-Wall -Wextra -Wpedantic)
+endif()
+
+# Find ament_cmake and ROS 2 dependencies
+find_package(ament_cmake REQUIRED)
+find_package(rclcpp REQUIRED)
+find_package(rclpy REQUIRED)
+find_package(std_msgs REQUIRED)
+find_package(geometry_msgs REQUIRED)
+find_package(nav_msgs REQUIRED)
+find_package(std_srvs REQUIRED)
+find_package(tf2_ros REQUIRED)
+find_package(tf2_geometry_msgs REQUIRED)
+find_package(sensor_msgs REQUIRED)
+find_package(cv_bridge REQUIRED)
+
+# If you have custom messages/services, you'd use rosidl_generate_interfaces here.
+# Since they were commented out in your original file, I've omitted them.
+
+# --- INSTALLING PYTHON SCRIPTS ---
+# In ROS 2, Python scripts are usually placed in a 'scripts' or 'nodes' folder.
+# This command makes them executable and places them in the lib folder of the install space.
+install(PROGRAMS
+  scripts/your_script_name.py  # Replace with your actual filenames
+  DESTINATION lib/${PROJECT_NAME}
 )
 
-## Generate messages in the 'msg' folder
-# add_message_files(
-#   FILES
-#   Message1.msg
-#   Message2.msg
-# )
-
-## Generate services in the 'srv' folder
-##add_service_files(
-  ## FILES
-  ## MoveToPosition.srv
-##)
-
-## Generate added messages and services with any dependencies listed here
-#generate_messages(
-#   DEPENDENCIES
-#   std_msgs
-#   geometry_msgs
-#   nav_msgs
-#   #mavros_msgs
-#)
-
-###################################
-## catkin specific configuration ##
-###################################
-catkin_package(
-  CATKIN_DEPENDS roscpp rospy std_msgs geometry_msgs sensor_msgs message_runtime nav_msgs std_srvs tf2_geometry_msgs cv_bridge
+# Install other directories (launch, config, etc.)
+install(DIRECTORY launch config
+  DESTINATION share/${PROJECT_NAME}
 )
 
-###########
-## Build ##
-###########
+if(BUILD_TESTING)
+  find_package(ament_lint_auto REQUIRED)
+  ament_lint_auto_find_test_dependencies()
+endif()
 
-## Specify additional locations of header files
-include_directories(
-  ${catkin_INCLUDE_DIRS}
-  include/
-)
-
-
-#add_executable(${PROJECT_NAME}_node src/main.cpp src/drone.cpp src/drone_state.cpp ${STATE_SRC_FILES})
-
-
-## Link libraries
-#target_link_libraries(${PROJECT_NAME}_node ${catkin_LIBRARIES})
+ament_package()
