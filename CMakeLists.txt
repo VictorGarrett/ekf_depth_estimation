@@ -30,7 +30,7 @@ find_package(cv_bridge REQUIRED)
 # In ROS 2, Python scripts are usually placed in a 'scripts' or 'nodes' folder.
 # This command makes them executable and places them in the lib folder of the install space.
 install(PROGRAMS
-  scripts/your_script_name.py  # Replace with your actual filenames
+  scripts/image_analyzer_ekf_slip_vel_absdepth_dyn.py  # Replace with your actual filenames
   DESTINATION lib/${PROJECT_NAME}
 )
 

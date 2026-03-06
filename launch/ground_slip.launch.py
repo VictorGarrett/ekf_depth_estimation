@@ -1,79 +1,79 @@
 import os
 from ament_index_python.packages import get_package_share_directory
 from launch import LaunchDescription
-from launch.actions import DeclareLaunchArgument, IncludeLaunchDescription, ExecuteProcess
+from launch.actions import IncludeLaunchDescription, DeclareLaunchArgument
 from launch.launch_description_sources import PythonLaunchDescriptionSource
-from launch.substitutions import LaunchConfiguration
 from launch_ros.actions import Node
 
+
+
 def generate_launch_description():
-    # 1. Paths and Folders
+    # 1. Start Gazebo Harmonic
+    # We include the standard gz_sim.launch.py provided by ros_gz_sim
+
     pkg_tracker_control = get_package_share_directory('tracker_control')
-    gazebo_ros_path = get_package_share_directory('gazebo_ros')
-    
-    world_path = os.path.join(pkg_tracker_control, 'worlds', 'test1.world')
-    sdf_model_path = os.path.join(pkg_tracker_control, 'models', 'sliping_robot', 'model.sdf')
 
-    # 2. Declare Launch Arguments (equivalent to <arg>)
-    world_arg = DeclareLaunchArgument('world', default_value=world_path)
-    use_sim_time = LaunchConfiguration('use_sim_time', default='true')
+    world_file_path = os.path.join(pkg_tracker_control, 'worlds', 'test1.world')
 
-    # 3. Include Gazebo Launch
-    # In ROS 2, gazebo.launch.py replaces empty_world.launch
-    gazebo = IncludeLaunchDescription(
+    gz_sim_pkg = get_package_share_directory('ros_gz_sim')
+    gazebo_launch = IncludeLaunchDescription(
         PythonLaunchDescriptionSource(
-            os.path.join(gazebo_ros_path, 'launch', 'gazebo.launch.py')
+            os.path.join(gz_sim_pkg, 'launch', 'gz_sim.launch.py')
         ),
-        launch_arguments={
-            'world': LaunchConfiguration('world'),
-            'gui': 'false',  # Set to 'true' if you want to see the Gazebo window
-        }.items()
+        # You can pass a specific world file here: 'empty.sdf' or your custom world
+        launch_arguments={'gz_args': f'-r {world_file_path}'}.items() 
     )
 
-    # 4. Spawn Robot Model
-    # Replaces 'spawn_model' with 'spawn_entity.py'
+    
+
+    sdf_file_path = os.path.join(pkg_tracker_control, 'models', 'sliping_robot', 'model.sdf')
+
+    # 2. Spawn your Robot ('sliping_robot') into the simulation
+    # Ensure your robot's SDF is somewhere in GZ_SIM_RESOURCE_PATH
     spawn_robot = Node(
-        package='gazebo_ros',
-        executable='spawn_entity.py',
+        package='ros_gz_sim',
+        executable='create',
         arguments=[
-            '-file', sdf_model_path,
-            '-entity', 'sliping_robot',
-            '-x', '-4.0', '-y', '0.0', '-z', '0.3'
+            '-name', 'sliping_robot',
+            '-file', sdf_file_path, # Replace with the actual path or use GZ_SIM_RESOURCE_PATH
+            '-x', '0.0', '-y', '0.0', '-z', '0.0'
         ],
         output='screen'
     )
 
-    # 5. Static Transform Publisher
-    # ROS 2 Arg order: x y z yaw pitch roll frame_id child_frame_id
-    static_tf = Node(
-        package='tf2_ros',
-        executable='static_transform_publisher',
-        arguments=['-4', '0', '0', '0', '0', '0', 'world', 'odom']
+    # 3. The ROS-Gazebo Bridge
+    # This replaces all the old `gazebo_ros` plugin topics. We map ROS 2 topics to Gazebo topics here.
+    # Syntax: /topic@ROS_TYPE[GZ_TYPE (for ROS->GZ) or ]GZ_TYPE (for GZ->ROS)
+    bridge = Node(
+        package='ros_gz_bridge',
+        executable='parameter_bridge',
+        arguments=[
+            # Clock (Crucial for ROS 2 time synchronization)
+            '/clock@rosgraph_msgs/msg/Clock[gz.msgs.Clock',
+            
+            # Camera and Ground Truth
+            '/camera/image_raw@sensor_msgs/msg/Image[gz.msgs.Image',
+            '/camera/camera_info@sensor_msgs/msg/CameraInfo[gz.msgs.CameraInfo',
+            '/ground_truth/odometry@nav_msgs/msg/Odometry[gz.msgs.Odometry',
+            
+            # --- FRONT LEFT MOTOR ---
+            # Command Voltage: ROS (Float64) -> Gazebo (Double)
+            '/front_left_motor/voltage@std_msgs/msg/Float64]gz.msgs.Double',
+            # Encoder Feedback: Gazebo (Double) -> ROS (Float64)
+            '/front_left_motor/encoder@std_msgs/msg/Float64[gz.msgs.Double',
+            
+            # --- FRONT RIGHT MOTOR ---
+            '/front_right_motor/voltage@std_msgs/msg/Float64]gz.msgs.Double',
+            '/front_right_motor/encoder@std_msgs/msg/Float64[gz.msgs.Double',
+            '/front_right_motor/force_torque@geometry_msgs/msg/WrenchStamped[gz.msgs.Wrench',
+            
+            # Add rear motors here as needed...
+        ],
+        output='screen'
     )
-
-    # 6. Image Publisher (replaces image_view/image_publisher)
-    image_pub = Node(
-        package='image_publisher',
-        executable='image_publisher_node',
-        name='image_pub',
-        parameters=[{'filename': '../lab.jpg'}],
-        remappings=[('/image', '/camera/image_raw')]
-    )
-
-    # 7. Our Ported EKF Node (The "Master Node")
-    # Uncomment to launch automatically
-    # tracker_node = Node(
-    #     package='tracker_control',
-    #     executable='image_analyzer.py', # Ensure this matches your CMakeLists entry
-    #     output='screen',
-    #     parameters=[{'use_sim_time': use_sim_time}]
-    # )
 
     return LaunchDescription([
-        world_arg,
-        gazebo,
+        gazebo_launch,
         spawn_robot,
-        static_tf,
-        image_pub,
-        # tracker_node
+        bridge
     ])

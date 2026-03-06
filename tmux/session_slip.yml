@@ -3,60 +3,39 @@ root: ./
 name: simulation
 socket_name: mrs
 
-startup_window: roscore
+startup_window: gazebo
 
 windows:
-  - roscore:
-      layout: tiled
-      panes:
-        - roscore
   - gazebo:
       layout: tiled
       panes:
         - |
-          export GAZEBO_RESOURCE_PATH=$GAZEBO_RESOURCE_PATH:$(pwd)/../
-          export GAZEBO_MODEL_PATH=$GAZEBO_MODEL_PATH:$(pwd)/../models
-          # Wait for roscore to be running
-          while ! rosnode list > /dev/null 2>&1; do
-            echo "Waiting for roscore to start..."
-            sleep 1
-          done
+          export GZ_SIM_RESOURCE_PATH=$GZ_SIM_RESOURCE_PATH:$(pwd)/../:$(pwd)/../models
           
-          roslaunch tracker_control ground_slip.launch
+          ros2 launch tracker_control ground_slip.launch.py
         - |
-            history -s "rostopic pub /setpoint_position std_msgs/Float32 'data: 2.0'"
+            history -s "ros2 topic pub -1 /setpoint_position std_msgs/msg/Float32 \"{data: 2.0}\""
 
   - node:
       layout: tiled
       panes:
         - |
-            # Wait for roscore to be running
-            while ! rosnode list > /dev/null 2>&1; do
-              echo "Waiting for roscore to start..."
-              sleep 1
-            done
-            while ! rostopic list | grep -q "/clock"; do
-              echo "Waiting for Gazebo to start and publish /clock..."
+            while ! ros2 topic list | grep -q "/clock"; do
+              echo "Waiting for Gazebo bridge to publish /clock..."
               sleep 0.5
             done
             echo "Gazebo is running!"
             sleep 5
-            rosrun tracker_control image_analyzer_ekf_slip_vel_absdepth_dyn.py
+            ros2 run tracker_control image_analyzer_ekf_slip_vel_absdepth_dyn.py
         - |
-            history -s "rostopic pub /setpoint_position std_msgs/Float32 'data: 2.0'"       
+            history -s "ros2 topic pub -1 /setpoint_position std_msgs/msg/Float32 \"{data: 2.0}\""       
+            
   - camera_image:
       layout: tiled
       panes:
-        - rosrun rqt_image_view rqt_image_view
-
+        - ros2 run rqt_image_view rqt_image_view
 
   - plotjuggler:
       layout: tiled
       panes:
-        - |
-          # Wait for roscore to be running
-          while ! rosnode list > /dev/null 2>&1; do
-            echo "Waiting for roscore to start..."
-            sleep 1
-          done
-          rosrun plotjuggler plotjuggler
+        - ros2 run plotjuggler plotjuggler
