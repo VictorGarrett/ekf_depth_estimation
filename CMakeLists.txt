@@ -35,7 +35,7 @@ install(PROGRAMS
 )
 
 # Install other directories (launch, config, etc.)
-install(DIRECTORY launch config
+install(DIRECTORY launch config worlds models
   DESTINATION share/${PROJECT_NAME}
 )
 
