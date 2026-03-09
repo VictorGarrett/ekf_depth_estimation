@@ -8,13 +8,13 @@ import cv2
 from nav_msgs.msg import Odometry
 from geometry_msgs.msg import Point, Twist, Vector3
 import numpy as np
-from std_msgs.msg import Float32, Int32
+from std_msgs.msg import Float32, Float64, Int32
 import tf2_ros
 import math
 from collections import deque
 
 # Assuming motor_controller.py is ported to ROS 2 similarly
-from .motor_controller import PIController 
+from tracker_control.motor_controller import PIController 
 
 class EKFHeightDepth:
     def __init__(self, f, r, b, m, k, j, res, l, gr, H0, Z0, a0, v0, i0, w0, theta0, P0, Q, R):
@@ -76,6 +76,8 @@ class EKFHeightDepth:
         self.Q_multiplier *= self.multiplier_decay_rate
 
     def update(self, h_meas, H_meas, w_meas, theta_meas):
+
+        print(f"Measurement: h={h_meas:.3f}, H={H_meas:.3f}, w={w_meas:.3f}, theta={theta_meas:.3f}")
         y_meas = np.array([h_meas, H_meas, w_meas, theta_meas])
         H, Z, a, v, i, w, theta = self.x
         y_pred = np.array([H*self.f/Z, H, w/self.gr, theta])
@@ -108,7 +110,8 @@ class ImageAnalyzer(Node):
         self.position_target = 3.1
         self.old_enc = (0, 0.0)
         self.wheel_velocity_buffer = deque([(0.0, 0.0)] * 3, maxlen=3)
-        
+        self.velocity = 0.0
+
         # Physics Constants
         f = 554.26
         gr, r, b, m, k, j, res, l = 10, 0.0525, 0.00011, 12.81, 0.021, 0.00011, 1.05, 0.001
@@ -133,10 +136,11 @@ class ImageAnalyzer(Node):
         self.depth_pub = self.create_publisher(Float32, '/estimated_depth', 10)
         self.vel_targ_pub = self.create_publisher(Float32, '/motor/setpoint_vel', 10)
         self.vel_enc_pub = self.create_publisher(Float32, '/motor/rnc_vel', 10)
-        self.fl_cmd_pub = self.create_publisher(Float32, '/front_left_motor/command', 10)
-        self.fr_cmd_pub = self.create_publisher(Float32, '/front_right_motor/command', 10)
+        self.fl_cmd_pub = self.create_publisher(Float64, '/front_left_motor/voltage', 10)
+        self.fr_cmd_pub = self.create_publisher(Float64, '/front_right_motor/voltage', 10)
         self.inov_pub = self.create_publisher(Vector3, '/inovation', 10)
         
+        print("twas never soft")
         # EKF State Publishers
         self.ekf_pubs = {
             'H': self.create_publisher(Float32, '/ekf/H', 10),
@@ -145,8 +149,9 @@ class ImageAnalyzer(Node):
             'v': self.create_publisher(Float32, '/ekf/v', 10)
         }
 
-        # --- Timer (100Hz) ---
         self.last_time = self.get_clock().now()
+        self.start_time = self.get_clock().now()
+        # --- Timer (100Hz) ---
         self.timer = self.create_timer(0.01, self.control_loop)
 
     def odom_callback(self, msg):
@@ -162,7 +167,7 @@ class ImageAnalyzer(Node):
         try:
             cv_image = self.bridge.imgmsg_to_cv2(msg, desired_encoding='bgr8')
             hsv = cv2.cvtColor(cv_image, cv2.COLOR_BGR2HSV)
-            mask = cv2.inRange(hsv, np.array([10, 100, 20]), np.array([20, 255, 200]))
+            mask = cv2.inRange(hsv, np.array([0, 0, 0]), np.array([180, 255, 75]))
             contours, _ = cv2.findContours(mask, cv2.RETR_EXTERNAL, cv2.CHAIN_APPROX_SIMPLE)
 
             if contours:
@@ -171,8 +176,18 @@ class ImageAnalyzer(Node):
                 v_center = cv_image.shape[0] // 2
                 dist_to_center = (y + h) - v_center + 1
                 
+                # Draw bounding box
+                cv2.rectangle(cv_image, (x, y), (x + w, y + h), (0, 255, 0), 2)
+                
+                # Publish image with bbox
+                self.image_pub.publish(self.bridge.cv2_to_imgmsg(cv_image, encoding='bgr8'))
+                
                 self.latest_height_data = (h, self.get_clock().now().nanoseconds / 1e9, dist_to_center)
                 self.height_used = False
+            else:
+                print("No contours found")
+
+
         except Exception as e:
             self.get_logger().error(f"Image error: {e}")
 
@@ -182,28 +197,35 @@ class ImageAnalyzer(Node):
         
         # Path Generation
         t = now
-        self.position_target = 3.0 + 0.9*math.sin(0.7*t) + 0.5*math.sin(0.2*t) + 0.3*math.sin(0.3*t)
+        #self.position_target = 3.0 + 0.9*math.sin(0.7*t)# + 0.5*math.sin(0.2*t) + 0.3*math.sin(0.3*t)
         
         H_est, Z_est, a_est, v_est, i_est, w_est, theta_est = self.ekf.x
-        velocity_target = 0.5 * (self.position_target - Z_est)
+        velocity_target = 0.9*math.sin(0.7*t)#0.5 * (self.position_target - Z_est)
+
+        #if (self.get_clock().now() - self.start_time) > rclpy.duration.Duration(seconds=10.0):
+        #    velocity_target = 0.05*3.14/2
+        #else:
+        #    velocity_target = 0
+
 
         # Encoder Velocity Logic
         enc_val, enc_time = self.latest_enc
         old_val, old_time = self.old_enc
         
-        avg_vel = 0.0
         if (enc_time - old_time) > 0:
-            dz = -((2 * math.pi * 0.05) / 4096) * (enc_val - old_val)
+            dz = (-0.05/10) * ((2 * math.pi) / 4096) * (enc_val - old_val)
             new_velocity = dz / (enc_time - old_time)
             
             # Smooth velocity
-            current_buffer_avg = sum(v[0] for v in self.wheel_velocity_buffer) / len(self.wheel_velocity_buffer)
-            velocity = 0.3 * new_velocity + 0.7 * current_buffer_avg
-            self.wheel_velocity_buffer.append((velocity, enc_time))
-            avg_vel = velocity
+            #current_buffer_avg = sum(v[0] for v in self.wheel_velocity_buffer) / len(self.wheel_velocity_buffer)
+            self.velocity = 0.3 * new_velocity + 0.7 * self.velocity
+            self.wheel_velocity_buffer.append((self.velocity, enc_time))
 
         # PI Control
-        voltage = self.motor_controller.compute_command(velocity_target/0.05, avg_vel/0.05)
+        self.vel_enc_pub.publish(Float32(data=self.velocity/0.05))
+        self.vel_targ_pub.publish(Float32(data=velocity_target/0.05))
+
+        voltage = self.motor_controller.compute_command(velocity_target/0.05, self.velocity/0.05)
         
         # EKF Predict
         self.ekf.predict(-voltage * 12, dt, now)
@@ -211,14 +233,15 @@ class ImageAnalyzer(Node):
         # EKF Update
         if not self.height_used:
             h, _, d_center = self.latest_height_data
-            y_innov = self.ekf.update(h, 0.28 * h / d_center, -avg_vel/0.05, (2*math.pi/4096)*enc_val)
+            y_innov = self.ekf.update(h, 0.28 * h / d_center, -self.velocity/0.05, (2*math.pi/4096)*enc_val)
             self.height_used = True
             self.inov_pub.publish(Vector3(x=float(y_innov[0]), y=float(y_innov[1]), z=float(np.linalg.norm(y_innov))))
 
         # Publish Results
         self.depth_pub.publish(Float32(data=-1.0 * self.ekf.x[1] - 0.9))
-        self.fl_cmd_pub.publish(Float32(data=-voltage))
-        self.fr_cmd_pub.publish(Float32(data=-voltage))
+        print("publishing voltage\n")
+        self.fl_cmd_pub.publish(Float64(data=-voltage))
+        self.fr_cmd_pub.publish(Float64(data=-voltage))
         
         self.ekf_pubs['H'].publish(Float32(data=float(self.ekf.x[5])))
         self.ekf_pubs['Z'].publish(Float32(data=float(self.ekf.x[1])))

@@ -12,6 +12,7 @@ endif()
 
 # Find ament_cmake and ROS 2 dependencies
 find_package(ament_cmake REQUIRED)
+find_package(ament_cmake_python REQUIRED)
 find_package(rclcpp REQUIRED)
 find_package(rclpy REQUIRED)
 find_package(std_msgs REQUIRED)
@@ -23,14 +24,15 @@ find_package(tf2_geometry_msgs REQUIRED)
 find_package(sensor_msgs REQUIRED)
 find_package(cv_bridge REQUIRED)
 
-# If you have custom messages/services, you'd use rosidl_generate_interfaces here.
-# Since they were commented out in your original file, I've omitted them.
+# --- INSTALLING PYTHON LIBRARY MODULE ---
+# <-- ADDED: This installs the folder containing your __init__.py and motor_controller.py
+ament_python_install_package(${PROJECT_NAME}) 
 
 # --- INSTALLING PYTHON SCRIPTS ---
 # In ROS 2, Python scripts are usually placed in a 'scripts' or 'nodes' folder.
 # This command makes them executable and places them in the lib folder of the install space.
 install(PROGRAMS
-  scripts/image_analyzer_ekf_slip_vel_absdepth_dyn.py  # Replace with your actual filenames
+  tracker_control/image_analyzer_ekf_slip_vel_absdepth_dyn.py  # Replace with your actual filenames
   DESTINATION lib/${PROJECT_NAME}
 )
 

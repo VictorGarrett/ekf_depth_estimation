@@ -11,6 +11,7 @@ windows:
       panes:
         - |
           export GZ_SIM_RESOURCE_PATH=$GZ_SIM_RESOURCE_PATH:$(pwd)/../:$(pwd)/../models
+          export GZ_SIM_SYSTEM_PLUGIN_PATH=$GZ_SIM_SYSTEM_PLUGIN_PATH:$(ros2 pkg prefix gz_dc_motor)/lib/gz_dc_motor
           
           ros2 launch tracker_control ground_slip.launch.py
         - |

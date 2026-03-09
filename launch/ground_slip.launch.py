@@ -36,7 +36,7 @@ def generate_launch_description():
         arguments=[
             '-name', 'sliping_robot',
             '-file', sdf_file_path, # Replace with the actual path or use GZ_SIM_RESOURCE_PATH
-            '-x', '0.0', '-y', '0.0', '-z', '0.0'
+            '-x', '-4.0', '-y', '0.0', '-z', '0.5'
         ],
         output='screen'
     )
@@ -60,12 +60,11 @@ def generate_launch_description():
             # Command Voltage: ROS (Float64) -> Gazebo (Double)
             '/front_left_motor/voltage@std_msgs/msg/Float64]gz.msgs.Double',
             # Encoder Feedback: Gazebo (Double) -> ROS (Float64)
-            '/front_left_motor/encoder@std_msgs/msg/Float64[gz.msgs.Double',
+            '/front_left_motor/encoder@std_msgs/msg/Int32[gz.msgs.Int32',
             
             # --- FRONT RIGHT MOTOR ---
             '/front_right_motor/voltage@std_msgs/msg/Float64]gz.msgs.Double',
-            '/front_right_motor/encoder@std_msgs/msg/Float64[gz.msgs.Double',
-            '/front_right_motor/force_torque@geometry_msgs/msg/WrenchStamped[gz.msgs.Wrench',
+            '/front_right_motor/encoder@std_msgs/msg/Int32[gz.msgs.Int32',
             
             # Add rear motors here as needed...
         ],

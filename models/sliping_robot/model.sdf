@@ -2,7 +2,6 @@
 <sdf version="1.8">
   <model name="sliping_robot">
     <static>false</static>
-    <pose>0 0 0 0 0 0</pose>
 
     <plugin filename="gz-sim-odometry-publisher-system" name="gz::sim::systems::OdometryPublisher">
       <odom_frame>world</odom_frame>
@@ -16,6 +15,14 @@
       <pose>0 0 0.18 0 0 0</pose>
       <inertial>
         <mass>10.0</mass>
+        <inertia>
+          <ixx>0.2</ixx>
+          <iyy>0.5</iyy>
+          <izz>0.6</izz>
+          <ixy>0</ixy>
+          <ixz>0</ixz>
+          <iyz>0</iyz>
+        </inertia>
       </inertial>
 
       <collision name="base_collision">
@@ -45,6 +52,7 @@
           <diffuse>0 0.5 1 1</diffuse>
         </material>
       </visual>
+      
       <visual name="camera_imu_visual">
         <pose>0.4 0 0.1 0 0 0</pose>
         <geometry>
@@ -87,7 +95,7 @@
         <inertia>
           <ixx>0.0006583</ixx>
           <iyy>0.0006583</iyy>
-          <izz>0.01125</izz>
+          <izz>0.00125</izz>
         </inertia>
       </inertial>
 
@@ -97,7 +105,7 @@
           <bounce>
             <restitution_coefficient>0</restitution_coefficient>
           </bounce>
-          <friction><ode><mu1>1.5</mu1><mu2>1.5</mu2></ode></friction>
+          <friction><ode><mu>1.5</mu><mu2>1.5</mu2></ode></friction>
           <contact>
             <ode>
               <kp>1e7</kp>
@@ -128,7 +136,12 @@
       <child>front_left_wheel</child>
       <axis>
         <xyz>0 0 1</xyz>
-        <limit effort="1000" velocity="1000" />
+        <limit>
+          <lower>-1e+16</lower>
+          <upper>1e+16</upper>
+          <effort>1000</effort>
+          <velocity>1000</velocity>
+        </limit>
         <dynamics>
           <damping>0.01</damping>
           <friction>0.0000001</friction>
@@ -136,7 +149,7 @@
       </axis>
     </joint>
 
-    <plugin name="front_left_motor_plugin" filename="libDCMotorPlugin.so">
+    <plugin name="DCMotorPlugin" filename="libDCMotorPlugin.so">
       <joint_name>front_left_joint</joint_name>
       <resistance>1.0</resistance>
       <torque_constant>0.02</torque_constant>
@@ -153,7 +166,7 @@
         <inertia>
           <ixx>0.0006583</ixx>
           <iyy>0.0006583</iyy>
-          <izz>0.01125</izz>
+          <izz>0.00125</izz>
         </inertia>
       </inertial>
 
@@ -162,7 +175,8 @@
         <update_rate>100</update_rate>
         <topic>/front_right_motor/force_torque</topic>
         <force_torque>
-          <frame>0</frame>
+          <frame>child</frame>
+          <measure_direction>child_to_parent</measure_direction>
         </force_torque>
       </sensor>
 
@@ -172,7 +186,7 @@
           <bounce>
             <restitution_coefficient>0</restitution_coefficient>
           </bounce>
-          <friction><ode><mu1>1.5</mu1><mu2>1.5</mu2></ode></friction>
+          <friction><ode><mu>1.5</mu><mu2>1.5</mu2></ode></friction>
           <contact>
             <ode>
               <kp>1e7</kp>
@@ -203,7 +217,12 @@
       <child>front_right_wheel</child>
       <axis>
         <xyz>0 0 1</xyz>
-        <limit effort="1000" velocity="1000" />
+        <limit>
+          <lower>-1e+16</lower>
+          <upper>1e+16</upper>
+          <effort>1000</effort>
+          <velocity>1000</velocity>
+        </limit>
         <dynamics>
           <damping>0.01</damping>
           <friction>0.000001</friction>
@@ -211,7 +230,7 @@
       </axis>
     </joint>
 
-    <plugin name="front_right_motor_plugin" filename="libDCMotorPlugin.so">
+    <plugin name="DCMotorPlugin" filename="libDCMotorPlugin.so">
       <joint_name>front_right_joint</joint_name>
       <resistance>1.0</resistance>
       <torque_constant>0.02</torque_constant>
@@ -226,9 +245,9 @@
       <inertial>
         <mass>0.1</mass>
         <inertia>
-          <ixx>0.00006583</ixx>
-          <iyy>0.00006583</iyy>
-          <izz>0.0000125</izz>
+          <ixx>0.006583</ixx>
+          <iyy>0.006583</iyy>
+          <izz>0.000125</izz>
         </inertia>
       </inertial>
 
@@ -238,7 +257,7 @@
           <bounce>
             <restitution_coefficient>0</restitution_coefficient>
           </bounce>
-          <friction><ode><mu1>0.5</mu1><mu2>0.5</mu2></ode></friction>
+          <friction><ode><mu>0.5</mu><mu2>0.5</mu2></ode></friction>
           <contact>
             <ode>
               <kp>1e6</kp>
@@ -269,7 +288,12 @@
       <child>rear_left_wheel</child>
       <axis>
         <xyz>0 0 1</xyz>
-        <limit effort="1000" velocity="1000" />
+        <limit>
+          <lower>-1e+16</lower>
+          <upper>1e+16</upper>
+          <effort>1000</effort>
+          <velocity>1000</velocity>
+        </limit>
         <dynamics>
           <damping>0.000005</damping>
           <friction>0.0000001</friction>
@@ -282,9 +306,9 @@
       <inertial>
         <mass>0.1</mass>
         <inertia>
-          <ixx>0.00006583</ixx>
-          <iyy>0.00006583</iyy>
-          <izz>0.0000125</izz>
+          <ixx>0.006583</ixx>
+          <iyy>0.006583</iyy>
+          <izz>0.000125</izz>
         </inertia>
       </inertial>
 
@@ -294,7 +318,7 @@
           <bounce>
             <restitution_coefficient>0</restitution_coefficient>
           </bounce>
-          <friction><ode><mu1>0.5</mu1><mu2>0.5</mu2></ode></friction>
+          <friction><ode><mu>0.5</mu><mu2>0.5</mu2></ode></friction>
           <contact>
             <ode>
               <kp>1e6</kp>
@@ -325,7 +349,12 @@
       <child>rear_right_wheel</child>
       <axis>
         <xyz>0 0 1</xyz>
-        <limit effort="1000" velocity="1000" />
+        <limit>
+          <lower>-1e+16</lower>
+          <upper>1e+16</upper>
+          <effort>1000</effort>
+          <velocity>1000</velocity>
+        </limit>
         <dynamics>
           <damping>0.000005</damping>
           <friction>0.0000001</friction>
