@@ -119,30 +119,6 @@ source install/setup.bash
 
 ## 5. Running the System
 
-The system will be.
+The whole system is run by the tmux script, simply run ./start_slip.sh inside the tmux folder.
 
-### Terminal 1: Launch Gazebo
-This terminal starts the Gazebo world, spawns the robot, and establishes the `ros_gz_bridge` connections.
-
-```bash
-cd ~/workspace
-source install/setup.bash
-
-# Export the plugin path so Gazebo finds libDCMotorPlugin.so
-export GZ_SIM_SYSTEM_PLUGIN_PATH=$GZ_SIM_SYSTEM_PLUGIN_PATH:~/workspace/src/dc_motor_plugin/build
-
-# Launch the simulation (replace sim.launch.py with your actual launch file name)
-ros2 launch tracker_control sim.launch.py 
-```
-
-### Terminal 2: Run the EKF Controller
-Once Gazebo is open and the robot has spawned, open a second terminal to run the Python node that handles vision, the EKF, and motor commands.
-
-```bash
-cd ~/workspace
-source install/setup.bash
-
-# Run the controller node
-ros2 run tracker_control image_analyzer_ekf_slip_vel_absdepth_dyn.py
-```
 
