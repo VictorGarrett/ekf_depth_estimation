@@ -167,8 +167,7 @@ class ImageAnalyzer(Node):
         self.fl_cmd_pub = self.create_publisher(Float64, '/front_left_motor/voltage', 10)
         self.fr_cmd_pub = self.create_publisher(Float64, '/front_right_motor/voltage', 10)
         self.inov_pub = self.create_publisher(Vector3, '/inovation', 10)
-        
-        print("twas never soft")
+
         # EKF State Publishers
         self.ekf_pubs = {
             'H': self.create_publisher(Float32, '/ekf/H', 10),
