@@ -37,6 +37,11 @@ sudo apt install ros-$ROS_DISTRO-ros-gz-sim ros-$ROS_DISTRO-ros-gz-bridge
 sudo apt install ros-$ROS_DISTRO-cv-bridge ros-$ROS_DISTRO-tf2-ros ros-$ROS_DISTRO-tf2-geometry-msgs
 ```
 
+**Tmux and Tmuxinator for running startup scripts**
+```bash
+sudo apt install tmux tmuxinator
+```
+
 ## 1. Setup Workspace & Clone Repositories
 
 Create a new ROS 2 workspace (if you haven't already) and clone this repository into the `src` directory.
@@ -44,27 +49,13 @@ Create a new ROS 2 workspace (if you haven't already) and clone this repository 
 ```bash
 mkdir -p ~/workspace/src
 cd ~/workspace/src
-# Clone this repository (replace with your actual repo URL)
-git clone [https://github.com/YOUR_USERNAME/tracker_control.git](https://github.com/YOUR_USERNAME/tracker_control.git)
-```
-
-## 2. Clone and Build the Motor Plugin
-
-The robot's SDF relies on a custom motor plugin (`libDCMotorPlugin.so`). You must build this plugin separately so Gazebo can load it during runtime.
-
-```bash
-cd ~/workspace/src
+# Clone this repository 
+git clone https://github.com/VictorGarrett/ekf_depth_estimation.git
 # Clone the motor plugin repository
 git clone https://github.com/VictorGarrett/gz_dc_motor.git
-
-# Build the plugin using standard CMake
-cd gz_dc_motor
-mkdir build && cd build
-cmake ..
-make
 ```
 
-## 3. Verify Directory Structure
+## 2. Verify Directory Structure
 
 **Top Level Workspace Structure**
 
@@ -100,7 +91,7 @@ make
     └── start_slip.sh       # Startup script
 ```
 
-## 4. Build the ROS 2 Package
+## 3. Build the ROS 2 Packages
 
 Build from the root of your workspace. Using `--symlink-install` allows you to edit your Python files without having to rebuild the package every time.
 
@@ -117,7 +108,7 @@ colcon build --symlink-install
 source install/setup.bash
 ```
 
-## 5. Running the System
+## 4. Running the System
 
 The whole system is run by the tmux script, simply run ./start_slip.sh inside the tmux folder.
 
