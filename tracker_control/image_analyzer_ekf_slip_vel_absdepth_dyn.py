@@ -44,6 +44,8 @@ class EKFHeightDepth:
         return dx
 
     def predict(self, u, dt, current_time):
+
+
         dx = self.dynamics(self.x, u)
         self.x[4] = (u - self.k * self.x[5]) / self.res
         self.x = dx * dt + self.x
@@ -51,13 +53,18 @@ class EKFHeightDepth:
         # Jacobian and Covariance Prediction
         J_eq = self.j + self.m * self.r**2 / 2
         b_eq = self.b
+
+        #w
         dwdot_di = (self.gr**2 * self.k) / J_eq
         dwdot_dw = -b_eq / J_eq
         
+        #v
         w_dot_val = (self.gr**2 * self.k * self.x[4] - b_eq * self.x[5]) / J_eq
         dvdot_da = - (self.r / self.gr) * w_dot_val
         dvdot_di = - (self.x[2] * self.r / self.gr) * dwdot_di
         dvdot_dw = - (self.x[2] * self.r / self.gr) * dwdot_dw
+
+        #i
         di_dw = -self.k / self.res
         
         F_jac = np.array([
@@ -78,9 +85,17 @@ class EKFHeightDepth:
     def update(self, h_meas, H_meas, w_meas, theta_meas):
 
         print(f"Measurement: h={h_meas:.3f}, H={H_meas:.3f}, w={w_meas:.3f}, theta={theta_meas:.3f}")
-        y_meas = np.array([h_meas, H_meas, w_meas, theta_meas])
+        y_meas = np.array([h_meas,
+                           H_meas,
+                           w_meas,
+                           theta_meas])
+
         H, Z, a, v, i, w, theta = self.x
-        y_pred = np.array([H*self.f/Z, H, w/self.gr, theta])
+
+        y_pred = np.array([H*self.f/Z,
+                           H,
+                           w/self.gr,
+                           theta])
 
         H_jac = np.array([
             [self.f/Z, -H*self.f/(Z**2), 0.0, 0.0, 0.0, 0.0, 0.0],
@@ -90,11 +105,17 @@ class EKFHeightDepth:
         ])
         
         y = y_meas - y_pred
+
+
         S = H_jac @ self.P @ H_jac.T + self.R
+
         if np.linalg.cond(S) < 1e12:
             K = self.P @ H_jac.T @ np.linalg.inv(S)
             self.x = self.x + K @ y
             self.P = (np.eye(7) - K @ H_jac) @ self.P
+            print(f"Updated State: H={self.x[0]:.3f}, Z={self.x[1]:.3f}, a={self.x[2]:.3f}, v={self.x[3]:.3f}, i={self.x[4]:.3f}, w={self.x[5]:.3f}, theta={self.x[6]:.3f}")
+        else:
+            print("S degenerated, skipping update")
         return y
 
 class ImageAnalyzer(Node):
@@ -114,7 +135,14 @@ class ImageAnalyzer(Node):
 
         # Physics Constants
         f = 554.26
-        gr, r, b, m, k, j, res, l = 10, 0.0525, 0.00011, 12.81, 0.021, 0.00011, 1.05, 0.001
+        gr = 10
+        r = 0.0525
+        b = 0.00011
+        m = 12.81
+        k = 0.021
+        j = 0.00011
+        res = 1.05
+        l = 0.001
         
         # EKF Initialization
         H0, Z0, a0, v0, i0, w0, theta0 = 1.0, 3.1, 0.95, 0.0, 0.0, 0.0, 0.0
@@ -200,7 +228,7 @@ class ImageAnalyzer(Node):
         #self.position_target = 3.0 + 0.9*math.sin(0.7*t)# + 0.5*math.sin(0.2*t) + 0.3*math.sin(0.3*t)
         
         H_est, Z_est, a_est, v_est, i_est, w_est, theta_est = self.ekf.x
-        velocity_target = 0.9*math.sin(0.7*t)#0.5 * (self.position_target - Z_est)
+        velocity_target = 0.5 * (self.position_target - Z_est)#0.4*math.sin(0.7*t)
 
         #if (self.get_clock().now() - self.start_time) > rclpy.duration.Duration(seconds=10.0):
         #    velocity_target = 0.05*3.14/2
@@ -239,13 +267,12 @@ class ImageAnalyzer(Node):
 
         # Publish Results
         self.depth_pub.publish(Float32(data=-1.0 * self.ekf.x[1] - 0.9))
-        print("publishing voltage\n")
         self.fl_cmd_pub.publish(Float64(data=-voltage))
         self.fr_cmd_pub.publish(Float64(data=-voltage))
         
-        self.ekf_pubs['H'].publish(Float32(data=float(self.ekf.x[5])))
+        self.ekf_pubs['H'].publish(Float32(data=float(self.ekf.x[0])))
         self.ekf_pubs['Z'].publish(Float32(data=float(self.ekf.x[1])))
-        self.ekf_pubs['a'].publish(Float32(data=float(self.ekf.x[4])))
+        self.ekf_pubs['a'].publish(Float32(data=float(self.ekf.x[2])))
         self.ekf_pubs['v'].publish(Float32(data=float(self.ekf.x[3])))
 
         self.old_enc = self.latest_enc
